@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import List, Set
+from typing import Set
 
 
 @dataclass
@@ -9,7 +9,7 @@ class Config:
     vk_bot_group_id: int
     sgo_username: str
     sgo_password: str
-    school_location: List[str]
+    school_name: str
     whitelisted_chat_peer_ids: Set[int]
 
     @classmethod
