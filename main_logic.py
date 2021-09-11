@@ -5,11 +5,12 @@ import re
 import traceback
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Tuple
 
 import vkbottle
 import vkbottle.bot
 import vkbottle.dispatch.rules.bot
+from PIL import Image as PILImageModule
 
 from config import Config
 from netschoolapi import NetSchoolAPI
@@ -22,6 +23,20 @@ HELP_MESSAGE = (
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
     r"расписание для 5\s*-+\s*11 классов на (\d+) .+".replace(r" ", r"\s*"),
     flags=re.IGNORECASE
+)
+
+
+class RectangleCoordinates:
+
+    def __init__(
+            self, top_left_corner: Tuple[int, int],
+            lower_right_corner: Tuple[int, int]):
+        self.box = top_left_corner + lower_right_corner
+
+
+TIMETABLE_CORNER_COORDINATES = RectangleCoordinates(
+    top_left_corner=(0, 513),
+    lower_right_corner=(186, 668)
 )
 
 
@@ -83,7 +98,7 @@ class Bot:
 
     async def get_timetable_attachment_string(self) -> str:
         async with self.timetable_getting_lock:
-            today_month_day_number = datetime.date.today().day - 1
+            today_month_day_number = datetime.date.today().day
             if (
                 self.cached_timetable_info
                 and (
@@ -109,6 +124,14 @@ class Bot:
                                     .download_attachment(
                                         attachment, path_or_file=file_buffer
                                     )
+                                )
+                                timetable = PILImageModule.open(
+                                    file_buffer
+                                ).crop(TIMETABLE_CORNER_COORDINATES.box)
+                                file_buffer = BytesIO()
+                                timetable.save(
+                                    file_buffer,
+                                    format=attachment.name.split(".")[-1]
                                 )
                                 attachment_string = (
                                     await vkbottle.PhotoMessageUploader(
