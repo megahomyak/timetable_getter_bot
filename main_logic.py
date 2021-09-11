@@ -69,7 +69,7 @@ def _future_done_callback(future: asyncio.Future):
             traceback.print_exc()
 
 
-MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS = 14
+MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS = 10
 
 
 class Bot:
@@ -159,12 +159,20 @@ class Bot:
                     self.config.timetable_checking_delay_in_seconds
                 )
             else:
+                utcnow = datetime.datetime.utcnow()
                 time_until_next_day = datetime.datetime.combine(
-                    datetime.date.today(),
+                    (
+                        datetime.date.today()
+                        if (
+                            utcnow.hour
+                            < MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS
+                        ) else
+                        datetime.date.today() + datetime.timedelta(days=1)
+                    ),
                     datetime.time(
                         hour=MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS
                     )
-                ) - datetime.datetime.utcnow()
+                ) - utcnow
                 await asyncio.sleep(time_until_next_day.total_seconds())
 
     async def send_timetable_to_peer_id(self, peer_id: int):
