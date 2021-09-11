@@ -69,7 +69,31 @@ def _future_done_callback(future: asyncio.Future):
             traceback.print_exc()
 
 
-MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS = 10
+MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC = 10
+NIGHT_HOUR_IN_UTC = 18
+
+SATURDAY = 6
+
+
+def get_timedelta_from_now_to(day, hour, today=None, now=None):
+    utcnow = now or datetime.datetime.now()
+    return datetime.datetime.combine(
+        (
+            today or datetime.date.today() + datetime.timedelta(
+                days=day if utcnow.hour < hour else day + 1
+            )
+        ),
+        datetime.time(hour=hour)
+    ) - utcnow
+
+
+async def sleep_to_the_end_of_the_next_school_day():
+    await asyncio.sleep(get_timedelta_from_now_to(
+        # Skipping the next day if current day is saturday because
+        # there are no classes on sunday
+        day=1 if datetime.date.today().weekday() == SATURDAY else 0,
+        hour=MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC
+    ).total_seconds())
 
 
 class Bot:
@@ -155,25 +179,14 @@ class Bot:
                     self.config.class_chat_peer_id
                 )
             except TimetableForTodayIsntFound:
-                await asyncio.sleep(
-                    self.config.timetable_checking_delay_in_seconds
-                )
-            else:
-                utcnow = datetime.datetime.utcnow()
-                time_until_next_day = datetime.datetime.combine(
-                    (
-                        datetime.date.today()
-                        if (
-                            utcnow.hour
-                            < MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS
-                        ) else
-                        datetime.date.today() + datetime.timedelta(days=1)
-                    ),
-                    datetime.time(
-                        hour=MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS
+                if datetime.datetime.utcnow().hour > NIGHT_HOUR_IN_UTC:
+                    await sleep_to_the_end_of_the_next_school_day()
+                else:
+                    await asyncio.sleep(
+                        self.config.timetable_checking_delay_in_seconds
                     )
-                ) - utcnow
-                await asyncio.sleep(time_until_next_day.total_seconds())
+            else:
+                await sleep_to_the_end_of_the_next_school_day()
 
     async def send_timetable_to_peer_id(self, peer_id: int):
         timetable_attachment_string = (
