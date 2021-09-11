@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Optional, Tuple
 
+import pytz
 import vkbottle
 import vkbottle.bot
 import vkbottle.dispatch.rules.bot
@@ -72,14 +73,20 @@ def _future_done_callback(future: asyncio.Future):
 MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC = 10
 NIGHT_HOUR_IN_UTC = 18
 
+YEKATERINBURG_TIMEZONE = pytz.timezone("Asia/Yekaterinburg")
+
 SATURDAY = 6
 
 
-def get_timedelta_from_now_to(day, hour, today=None, now=None):
+def today():
+    return datetime.datetime.now(YEKATERINBURG_TIMEZONE).date()
+
+
+def get_timedelta_from_now_to(day, hour, today_=None, now=None):
     utcnow = now or datetime.datetime.now()
     return datetime.datetime.combine(
         (
-            today or datetime.date.today() + datetime.timedelta(
+            today_ or today() + datetime.timedelta(
                 days=day if utcnow.hour < hour else day + 1
             )
         ),
@@ -91,7 +98,7 @@ async def sleep_to_the_end_of_the_next_school_day():
     await asyncio.sleep(get_timedelta_from_now_to(
         # Skipping the next day if current day is saturday because
         # there are no classes on sunday
-        day=1 if datetime.date.today().weekday() == SATURDAY else 0,
+        day=1 if today().weekday() == SATURDAY else 0,
         hour=MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC
     ).total_seconds())
 
@@ -122,9 +129,7 @@ class Bot:
 
     async def get_timetable_attachment_string(self) -> str:
         async with self.timetable_getting_lock:
-            next_day_number = (
-                (datetime.date.today() + datetime.timedelta(days=1)).day
-            )
+            next_day_number = (today() + datetime.timedelta(days=1)).day
             if (
                 self.cached_timetable_info
                 and (
