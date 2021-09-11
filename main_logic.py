@@ -54,6 +54,9 @@ def _future_done_callback(future: asyncio.Future):
             traceback.print_exc()
 
 
+MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS = 14
+
+
 class Bot:
 
     def __init__(
@@ -78,16 +81,15 @@ class Bot:
         )
         await self.vk_client.run_polling()
 
-    async def get_timetable_attachment_string(self, should_be_new=False) -> str:
+    async def get_timetable_attachment_string(self) -> str:
         async with self.timetable_getting_lock:
-            today_month_day_number = datetime.date.today().day
+            today_month_day_number = datetime.date.today().day - 1
             if (
                 self.cached_timetable_info
                 and (
                     self.cached_timetable_info.month_day_number
                     == today_month_day_number
                 )
-                and not should_be_new
             ):
                 return self.cached_timetable_info.attachment_string
             for announcement in await self.netschoolapi_client.announcements():
@@ -127,16 +129,24 @@ class Bot:
         while True:
             try:
                 await self.send_timetable_to_peer_id(
-                    self.config.class_chat_peer_id, timetable_should_be_new=True
+                    self.config.class_chat_peer_id
                 )
             except TimetableForTodayIsntFound:
-                pass
-            await asyncio.sleep(self.config.timetable_checking_delay_in_seconds)
+                await asyncio.sleep(
+                    self.config.timetable_checking_delay_in_seconds
+                )
+            else:
+                time_until_next_day = datetime.datetime.combine(
+                    datetime.date.today(),
+                    datetime.time(
+                        hour=MINIMUM_TIMETABLE_SENDING_TIME_IN_UTC_HOURS
+                    )
+                ) - datetime.datetime.utcnow()
+                await asyncio.sleep(time_until_next_day.total_seconds())
 
-    async def send_timetable_to_peer_id(
-            self, peer_id: int, timetable_should_be_new=False):
+    async def send_timetable_to_peer_id(self, peer_id: int):
         timetable_attachment_string = (
-            await self.get_timetable_attachment_string(timetable_should_be_new)
+            await self.get_timetable_attachment_string()
         )
         await self.vk_client.api.messages.send(
             attachment=timetable_attachment_string,
