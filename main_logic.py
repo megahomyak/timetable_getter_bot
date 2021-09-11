@@ -122,12 +122,14 @@ class Bot:
 
     async def get_timetable_attachment_string(self) -> str:
         async with self.timetable_getting_lock:
-            today_month_day_number = datetime.date.today().day
+            next_day_number = (
+                (datetime.date.today() + datetime.timedelta(days=1)).day
+            )
             if (
                 self.cached_timetable_info
                 and (
                     self.cached_timetable_info.month_day_number
-                    == today_month_day_number
+                    == next_day_number
                 )
             ):
                 return self.cached_timetable_info.attachment_string
@@ -137,7 +139,7 @@ class Bot:
                 )
                 if match:
                     match_month_day_number = int(match.group(1))
-                    if match_month_day_number == today_month_day_number:
+                    if match_month_day_number == next_day_number:
                         for attachment in announcement.attachments:
                             if TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.fullmatch(
                                 attachment.name
@@ -164,7 +166,7 @@ class Bot:
                                 )
                                 self.cached_timetable_info = (
                                     CachedTimetableInfo(
-                                        month_day_number=today_month_day_number,
+                                        month_day_number=next_day_number,
                                         attachment_string=attachment_string
                                     )
                                 )
