@@ -143,7 +143,7 @@ class Bot:
                         attachment.name
                     )
                     if match:
-                        if match.group(1) == next_day_number:
+                        if int(match.group(1)) == next_day_number:
                             file_buffer = BytesIO()
                             await self.netschoolapi_client.download_attachment(
                                 attachment, path_or_file=file_buffer
