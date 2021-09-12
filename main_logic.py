@@ -22,8 +22,7 @@ HELP_MESSAGE = (
 )
 
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
-    r"расписание для 5\s*-+\s*11 классов на (\d+) .+".replace(r" ", r"\s*"),
-    flags=re.IGNORECASE
+    r"расписание для 5-11 классов на (\d+).+", flags=re.IGNORECASE
 )
 
 
@@ -139,44 +138,37 @@ class Bot:
             ):
                 return self.cached_timetable_info.attachment_string
             for announcement in await self.netschoolapi_client.announcements():
-                match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.fullmatch(
-                    announcement.name
-                )
-                if match:
-                    match_month_day_number = int(match.group(1))
-                    if match_month_day_number == next_day_number:
-                        for attachment in announcement.attachments:
-                            if TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.fullmatch(
-                                attachment.name
-                            ):
-                                file_buffer = BytesIO()
-                                await (
-                                    self.netschoolapi_client
-                                    .download_attachment(
-                                        attachment, path_or_file=file_buffer
-                                    )
+                for attachment in announcement.attachments:
+                    match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.fullmatch(
+                        attachment.name
+                    )
+                    if match:
+                        if match.group(1) == next_day_number:
+                            file_buffer = BytesIO()
+                            await self.netschoolapi_client.download_attachment(
+                                attachment, path_or_file=file_buffer
+                            )
+                            timetable = PILImageModule.open(
+                                file_buffer
+                            ).crop(TIMETABLE_CORNER_COORDINATES.box)
+                            file_buffer = BytesIO()
+                            timetable.save(
+                                file_buffer,
+                                format=attachment.name.split(".")[-1]
+                            )
+                            attachment_string = (
+                                await vkbottle.PhotoMessageUploader(
+                                    api=self.vk_client.api
+                                ).upload(file_buffer)
+                            )
+                            self.cached_timetable_info = (
+                                CachedTimetableInfo(
+                                    month_day_number=next_day_number,
+                                    attachment_string=attachment_string
                                 )
-                                timetable = PILImageModule.open(
-                                    file_buffer
-                                ).crop(TIMETABLE_CORNER_COORDINATES.box)
-                                file_buffer = BytesIO()
-                                timetable.save(
-                                    file_buffer,
-                                    format=attachment.name.split(".")[-1]
-                                )
-                                attachment_string = (
-                                    await vkbottle.PhotoMessageUploader(
-                                        api=self.vk_client.api
-                                    ).upload(file_buffer)
-                                )
-                                self.cached_timetable_info = (
-                                    CachedTimetableInfo(
-                                        month_day_number=next_day_number,
-                                        attachment_string=attachment_string
-                                    )
-                                )
-                                return attachment_string
-                    break
+                            )
+                            return attachment_string
+                        raise TimetableForTodayIsntFound
             raise TimetableForTodayIsntFound
 
     async def check_timetable_periodically_and_send_it(self):
