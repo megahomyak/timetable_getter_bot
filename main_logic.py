@@ -5,7 +5,7 @@ import re
 import traceback
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Optional, Tuple
+from typing import Optional
 
 import pytz
 import vkbottle
@@ -14,6 +14,7 @@ import vkbottle.dispatch.rules.bot
 from PIL import Image as PILImageModule
 
 from config import Config
+from image_cropper import ImageCropper
 from netschoolapi import NetSchoolAPI
 
 HELP_MESSAGE = (
@@ -23,20 +24,6 @@ HELP_MESSAGE = (
 
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
     r"расписание для 5-11 классов на (\d+).+", flags=re.IGNORECASE
-)
-
-
-class RectangleCoordinates:
-
-    def __init__(
-            self, top_left_corner: Tuple[int, int],
-            lower_right_corner: Tuple[int, int]):
-        self.box = top_left_corner + lower_right_corner
-
-
-TIMETABLE_CORNER_COORDINATES = RectangleCoordinates(
-    top_left_corner=(0, 513),
-    lower_right_corner=(186, 668)
 )
 
 
@@ -148,12 +135,12 @@ class Bot:
                             await self.netschoolapi_client.download_attachment(
                                 attachment, path_or_file=file_buffer
                             )
-                            timetable = PILImageModule.open(
-                                file_buffer
-                            ).crop(TIMETABLE_CORNER_COORDINATES.box)
+                            image_cropper = ImageCropper(
+                                PILImageModule.open(file_buffer)
+                            )
                             file_buffer = BytesIO()
                             format_ = attachment.name.split(".")[-1]
-                            timetable.save(
+                            image_cropper.crop().save(
                                 file_buffer,
                                 format="jpeg" if format_ == "jpg" else format_
                             )
