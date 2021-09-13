@@ -152,9 +152,10 @@ class Bot:
                                 file_buffer
                             ).crop(TIMETABLE_CORNER_COORDINATES.box)
                             file_buffer = BytesIO()
+                            format_ = attachment.name.split(".")[-1]
                             timetable.save(
                                 file_buffer,
-                                format=attachment.name.split(".")[-1]
+                                format="jpeg" if format_ == "jpg" else format_
                             )
                             attachment_string = (
                                 await vkbottle.PhotoMessageUploader(
