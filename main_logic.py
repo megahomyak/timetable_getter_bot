@@ -56,8 +56,8 @@ def _future_done_callback(future: asyncio.Future):
             traceback.print_exc()
 
 
-MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC = 10
-NIGHT_HOUR_IN_UTC = 18
+MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC = 7
+NIGHT_HOUR_IN_UTC = 17
 
 YEKATERINBURG_TIMEZONE = pytz.timezone("Asia/Yekaterinburg")
 
