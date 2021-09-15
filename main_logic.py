@@ -31,6 +31,7 @@ TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
 class CachedTimetableInfo:
     month_day_number: int
     attachment_string: str
+    date: datetime.date
 
 
 class TimetableForTodayIsntFound(Exception):
@@ -113,9 +114,10 @@ class Bot:
         )
         await self.vk_client.run_polling()
 
-    async def get_timetable_attachment_string(self) -> str:
+    async def get_timetable_info(self) -> CachedTimetableInfo:
         async with self.timetable_getting_lock:
-            next_day_number = (today() + datetime.timedelta(days=1)).day
+            timetable_date = today() + datetime.timedelta(days=1)
+            next_day_number = timetable_date.day
             if (
                 self.cached_timetable_info
                 and (
@@ -123,7 +125,7 @@ class Bot:
                     == next_day_number
                 )
             ):
-                return self.cached_timetable_info.attachment_string
+                return self.cached_timetable_info
             for announcement in await self.netschoolapi_client.announcements():
                 for attachment in announcement.attachments:
                     match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.fullmatch(
@@ -154,10 +156,11 @@ class Bot:
                             self.cached_timetable_info = (
                                 CachedTimetableInfo(
                                     month_day_number=next_day_number,
-                                    attachment_string=attachment_string
+                                    attachment_string=attachment_string,
+                                    date=timetable_date
                                 )
                             )
-                            return attachment_string
+                            return self.cached_timetable_info
                         raise TimetableForTodayIsntFound
             raise TimetableForTodayIsntFound
 
@@ -178,11 +181,10 @@ class Bot:
                 await sleep_to_the_end_of_the_next_school_day()
 
     async def send_timetable_to_peer_id(self, peer_id: int):
-        timetable_attachment_string = (
-            await self.get_timetable_attachment_string()
-        )
+        timetable_info = await self.get_timetable_info()
         await self.vk_client.api.messages.send(
-            attachment=timetable_attachment_string,
+            attachment=timetable_info.attachment_string,
+            message="Расписание на " + timetable_info.date.strftime("%d.%m.%Y"),
             peer_id=peer_id,
             random_id=random.randint(-1_000_000, 1_000_000)
         )
