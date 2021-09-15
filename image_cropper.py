@@ -45,7 +45,7 @@ class ImageCropper:
             self.go_right_while_color_is_black,
             self.go_right_until_color_is_black
         ) = (
-            functools.partial(fn, functools.partial(action, self.coordinates))
+            functools.partial(fn, functools.partial(action))
             for fn, action in (
                 (self._go_while_black, _decrement_y),
                 (self._go_until_black, _decrement_y),
@@ -60,14 +60,14 @@ class ImageCropper:
 
     def _go_while_black(self, action):
         while color_looks_like(self._get_current_pixel(), BLACK):
-            action()
+            action(self.coordinates)
 
     def _get_current_pixel(self):
         return self.image.getpixel(tuple(self.coordinates))
 
     def _go_until_black(self, action):
         while not color_looks_like(self._get_current_pixel(), BLACK):
-            action()
+            action(self.coordinates)
 
     def _go_one_row_up_and_get_row_height(self):
         row_lower_border = self.coordinates[1]
@@ -81,15 +81,21 @@ class ImageCropper:
         lower_border = self.coordinates[1]
         self.go_right_until_color_is_black()
         self.go_right_while_color_is_black()
-        self.go_right_until_color_is_black()
-        self.coordinates[0] -= 1
-        right_border = self.coordinates[0]
         max_common_row_height = self._go_one_row_up_and_get_row_height() * 2
+        self.go_up_while_color_is_black()
         while self._go_one_row_up_and_get_row_height() < max_common_row_height:
             self.go_up_while_color_is_black()
-        upper_border = self.coordinates[1] + 1
+        old_coordinates = self.coordinates.copy()
         self.go_left_while_color_is_black()
         left_border = self.coordinates[0] + 1
+        self.coordinates = old_coordinates
+        self.coordinates[1] += 1
+        upper_border = self.coordinates[1]
+        for _ in range(3):
+            self.go_right_until_color_is_black()
+            self.go_right_while_color_is_black()
+        self.go_right_until_color_is_black()
+        right_border = self.coordinates[0] - 1
         return self.image.crop((
             left_border,
             upper_border,
