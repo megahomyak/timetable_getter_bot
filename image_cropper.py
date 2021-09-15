@@ -79,7 +79,7 @@ class ImageCropper:
     def _go_while_black(self, action):
         try:
             while color_looks_like(self._get_current_pixel(), BLACK):
-                action(self.coordinates)
+                action(self.coordinates, self.image)
         except _NowhereToGo:
             pass
 
@@ -89,7 +89,7 @@ class ImageCropper:
     def _go_until_black(self, action):
         try:
             while not color_looks_like(self._get_current_pixel(), BLACK):
-                action(self.coordinates)
+                action(self.coordinates, self.image)
         except _NowhereToGo:
             pass
 
