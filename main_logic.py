@@ -131,9 +131,11 @@ class Bot:
                     )
                     if match:
                         if int(match.group(1)) == next_day_number:
-                            file_buffer = BytesIO()
-                            await self.netschoolapi_client.download_attachment(
-                                attachment, path_or_file=file_buffer
+                            file_buffer = (
+                                await self.netschoolapi_client
+                                .download_attachment_as_bytes(
+                                    attachment
+                                )
                             )
                             image_cropper = ImageCropper(
                                 PILImageModule.open(file_buffer)
