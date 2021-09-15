@@ -114,60 +114,62 @@ class Bot:
         )
         await self.vk_client.run_polling()
 
-    async def get_timetable_info(self) -> CachedTimetableInfo:
+    async def update_timetable(self):
         async with self.timetable_getting_lock:
             timetable_date = today() + datetime.timedelta(days=1)
             next_day_number = timetable_date.day
             if (
-                self.cached_timetable_info
-                and (
+                not self.cached_timetable_info
+                or (
                     self.cached_timetable_info.month_day_number
-                    == next_day_number
+                    != next_day_number
                 )
             ):
-                return self.cached_timetable_info
-            for announcement in await self.netschoolapi_client.announcements():
-                for attachment in announcement.attachments:
-                    match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.fullmatch(
-                        attachment.name
-                    )
-                    if match:
-                        if int(match.group(1)) == next_day_number:
-                            file_buffer = (
-                                await self.netschoolapi_client
-                                .download_attachment_as_bytes(
-                                    attachment
+                for announcement in (
+                    await self.netschoolapi_client.announcements()
+                ):
+                    for attachment in announcement.attachments:
+                        match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.fullmatch(
+                            attachment.name
+                        )
+                        if match:
+                            if int(match.group(1)) == next_day_number:
+                                file_buffer = (
+                                    await self.netschoolapi_client
+                                    .download_attachment_as_bytes(
+                                        attachment
+                                    )
                                 )
-                            )
-                            image_cropper = ImageCropper(
-                                PILImageModule.open(file_buffer)
-                            )
-                            file_buffer = BytesIO()
-                            format_ = attachment.name.split(".")[-1]
-                            image_cropper.crop().save(
-                                file_buffer,
-                                format="jpeg" if format_ == "jpg" else format_
-                            )
-                            attachment_string = (
-                                await vkbottle.PhotoMessageUploader(
-                                    api=self.vk_client.api
-                                ).upload(file_buffer)
-                            )
-                            self.cached_timetable_info = (
-                                CachedTimetableInfo(
-                                    month_day_number=next_day_number,
-                                    attachment_string=attachment_string,
-                                    date=timetable_date
+                                image_cropper = ImageCropper(
+                                    PILImageModule.open(file_buffer)
                                 )
-                            )
-                            return self.cached_timetable_info
-                        raise TimetableForTodayIsntFound
-            raise TimetableForTodayIsntFound
+                                file_buffer = BytesIO()
+                                format_ = attachment.name.split(".")[-1]
+                                image_cropper.crop().save(
+                                    file_buffer,
+                                    format=(
+                                        "jpeg" if format_ == "jpg" else format_
+                                    )
+                                )
+                                attachment_string = (
+                                    await vkbottle.PhotoMessageUploader(
+                                        api=self.vk_client.api
+                                    ).upload(file_buffer)
+                                )
+                                self.cached_timetable_info = (
+                                    CachedTimetableInfo(
+                                        month_day_number=next_day_number,
+                                        attachment_string=attachment_string,
+                                        date=timetable_date
+                                    )
+                                )
+                            else:
+                                raise TimetableForTodayIsntFound
 
     async def check_timetable_periodically_and_send_it(self):
         while True:
             try:
-                await self.send_timetable_to_peer_id(
+                await self.update_timetable_and_send_it_to_peer_id(
                     self.config.class_chat_peer_id
                 )
             except TimetableForTodayIsntFound:
@@ -180,11 +182,17 @@ class Bot:
             else:
                 await sleep_to_the_end_of_the_next_school_day()
 
+    async def update_timetable_and_send_it_to_peer_id(self, peer_id: int):
+        await self.update_timetable()
+        await self.send_timetable_to_peer_id(peer_id)
+
     async def send_timetable_to_peer_id(self, peer_id: int):
-        timetable_info = await self.get_timetable_info()
         await self.vk_client.api.messages.send(
-            attachment=timetable_info.attachment_string,
-            message="Расписание на " + timetable_info.date.strftime("%d.%m.%Y"),
+            attachment=self.cached_timetable_info.attachment_string,
+            message=(
+                "Расписание на "
+                + self.cached_timetable_info.date.strftime("%d.%m.%Y")
+            ),
             peer_id=peer_id,
             random_id=random.randint(-1_000_000, 1_000_000)
         )
@@ -194,9 +202,14 @@ class Bot:
             text = message.text[1:].casefold()
             if text == "расписание":
                 try:
-                    await self.send_timetable_to_peer_id(message.peer_id)
+                    await self.update_timetable_and_send_it_to_peer_id(
+                        message.peer_id
+                    )
                 except TimetableForTodayIsntFound:
-                    await message.answer("Расписания пока нет!")
+                    if self.cached_timetable_info:
+                        await self.send_timetable_to_peer_id(message.peer_id)
+                    else:
+                        await message.answer("Расписания пока нет!")
             elif text in ("помощь", "команды"):
                 await message.answer(HELP_MESSAGE)
 
