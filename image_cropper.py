@@ -12,20 +12,38 @@ def color_looks_like(first_color, second_color):
     )
 
 
-def _increment_y(coordinates):
+class _NowhereToGo(Exception):
+    pass
+
+
+def _increment_y(coordinates, image):
     coordinates[1] += 1
+    if coordinates[1] == image.width:
+        coordinates[1] -= 1
+        raise _NowhereToGo
 
 
-def _increment_x(coordinates):
+def _increment_x(coordinates, image):
     coordinates[0] += 1
+    if coordinates[0] == image.height:
+        coordinates[0] -= 1
+        raise _NowhereToGo
 
 
-def _decrement_y(coordinates):
-    coordinates[1] -= 1
+# noinspection PyUnusedLocal
+def _decrement_y(coordinates, image):
+    if coordinates[1] == 0:
+        raise _NowhereToGo
+    else:
+        coordinates[1] -= 1
 
 
-def _decrement_x(coordinates):
-    coordinates[0] -= 1
+# noinspection PyUnusedLocal
+def _decrement_x(coordinates, image):
+    if coordinates[0] == 0:
+        raise _NowhereToGo
+    else:
+        coordinates[0] -= 1
 
 
 class ImageCropper:
@@ -59,15 +77,21 @@ class ImageCropper:
         )
 
     def _go_while_black(self, action):
-        while color_looks_like(self._get_current_pixel(), BLACK):
-            action(self.coordinates)
+        try:
+            while color_looks_like(self._get_current_pixel(), BLACK):
+                action(self.coordinates)
+        except _NowhereToGo:
+            pass
 
     def _get_current_pixel(self):
         return self.image.getpixel(tuple(self.coordinates))
 
     def _go_until_black(self, action):
-        while not color_looks_like(self._get_current_pixel(), BLACK):
-            action(self.coordinates)
+        try:
+            while not color_looks_like(self._get_current_pixel(), BLACK):
+                action(self.coordinates)
+        except _NowhereToGo:
+            pass
 
     def _go_one_row_up_and_get_row_height(self):
         row_lower_border = self.coordinates[1]
