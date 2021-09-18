@@ -12,10 +12,10 @@ import vkbottle
 import vkbottle.bot
 import vkbottle.dispatch.rules.bot
 from PIL import Image as PILImageModule
+from netschoolapi import NetSchoolAPI
 
 from config import Config
 from image_cropper import ImageCropper
-from netschoolapi import NetSchoolAPI
 
 HELP_MESSAGE = (
     "/помощь (или \"/команды\") - это сообщение\n"
@@ -34,7 +34,7 @@ class CachedTimetableInfo:
     date: datetime.date
 
 
-class TimetableForTodayIsntFound(Exception):
+class TimetableForTomorrowIsntFound(Exception):
     pass
 
 
@@ -57,36 +57,43 @@ def _future_done_callback(future: asyncio.Future):
             traceback.print_exc()
 
 
-MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC = 7
-NIGHT_HOUR_IN_UTC = 17
+MINIMUM_TIMETABLE_SENDING_HOUR = 12
+NIGHT_HOUR = 22
 
 YEKATERINBURG_TIMEZONE = pytz.timezone("Asia/Yekaterinburg")
 
 SATURDAY = 6
 
 
+def now():
+    return datetime.datetime.now(YEKATERINBURG_TIMEZONE)
+
+
 def today():
-    return datetime.datetime.now(YEKATERINBURG_TIMEZONE).date()
+    return now().date()
 
 
-def get_timedelta_from_now_to(day, hour, today_=None, now=None):
-    utcnow = now or datetime.datetime.now()
+def get_timedelta_from_now_to(
+        additional_days_amount, hour, today_=None, now_=None):
+    now_ = now_ or now()
     return datetime.datetime.combine(
         (
             today_ or today() + datetime.timedelta(
-                days=day if utcnow.hour < hour else day + 1
+                days=(
+                    additional_days_amount
+                    if now_.hour < hour else
+                    additional_days_amount + 1
+                )
             )
         ),
         datetime.time(hour=hour)
-    ) - utcnow
+    ) - now_
 
 
-async def sleep_to_the_end_of_the_next_school_day():
+async def sleep_to_the_end_of_the_next_school_day(additional_days_amount):
     await asyncio.sleep(get_timedelta_from_now_to(
-        # Skipping the next day if current day is saturday because
-        # there are no classes on sunday
-        day=1 if today().weekday() == SATURDAY else 0,
-        hour=MINIMUM_TIMETABLE_SENDING_HOUR_IN_UTC
+        additional_days_amount=additional_days_amount,
+        hour=MINIMUM_TIMETABLE_SENDING_HOUR
     ).total_seconds())
 
 
@@ -114,12 +121,17 @@ class Bot:
         )
         await self.vk_client.run_polling()
 
-    async def update_timetable(self):
+    async def update_timetable(self, ignore_cached: bool):
         async with self.timetable_getting_lock:
-            timetable_date = today() + datetime.timedelta(days=1)
+            today_ = today()
+            timetable_date = today_ + datetime.timedelta(
+                # Skipping the sunday
+                days=2 if today_.weekday() == SATURDAY else 1
+            )
             next_day_number = timetable_date.day
             if (
-                not self.cached_timetable_info
+                ignore_cached
+                or not self.cached_timetable_info
                 or (
                     self.cached_timetable_info.month_day_number
                     != next_day_number
@@ -164,26 +176,33 @@ class Bot:
                                     )
                                 )
                             else:
-                                raise TimetableForTodayIsntFound
+                                raise TimetableForTomorrowIsntFound
 
     async def check_timetable_periodically_and_send_it(self):
         while True:
             try:
                 await self.update_timetable_and_send_it_to_peer_id(
-                    self.config.class_chat_peer_id
+                    self.config.class_chat_peer_id, ignore_cached=True
                 )
-            except TimetableForTodayIsntFound:
-                if datetime.datetime.utcnow().hour > NIGHT_HOUR_IN_UTC:
-                    await sleep_to_the_end_of_the_next_school_day()
+            except TimetableForTomorrowIsntFound:
+                if now().hour > NIGHT_HOUR:
+                    await sleep_to_the_end_of_the_next_school_day(
+                        additional_days_amount=0
+                    )
                 else:
                     await asyncio.sleep(
                         self.config.timetable_checking_delay_in_seconds
                     )
             else:
-                await sleep_to_the_end_of_the_next_school_day()
+                await sleep_to_the_end_of_the_next_school_day(
+                    additional_days_amount=(
+                        1 if today().weekday() == SATURDAY else 0
+                    )
+                )
 
-    async def update_timetable_and_send_it_to_peer_id(self, peer_id: int):
-        await self.update_timetable()
+    async def update_timetable_and_send_it_to_peer_id(
+            self, peer_id: int, ignore_cached: bool):
+        await self.update_timetable(ignore_cached)
         await self.send_timetable_to_peer_id(peer_id)
 
     async def send_timetable_to_peer_id(self, peer_id: int):
@@ -203,9 +222,9 @@ class Bot:
             if text == "расписание":
                 try:
                     await self.update_timetable_and_send_it_to_peer_id(
-                        message.peer_id
+                        message.peer_id, ignore_cached=False
                     )
-                except TimetableForTodayIsntFound:
+                except TimetableForTomorrowIsntFound:
                     if self.cached_timetable_info:
                         await self.send_timetable_to_peer_id(message.peer_id)
                     else:
