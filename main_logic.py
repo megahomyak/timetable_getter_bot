@@ -62,11 +62,11 @@ NIGHT_HOUR = 22
 
 YEKATERINBURG_TIMEZONE = pytz.timezone("Asia/Yekaterinburg")
 
-SATURDAY = 6
+SATURDAY = 5
 
 
 def now():
-    return datetime.datetime.now(YEKATERINBURG_TIMEZONE)
+    return datetime.datetime.now(tz=YEKATERINBURG_TIMEZONE)
 
 
 def today():
@@ -86,7 +86,7 @@ def get_timedelta_from_now_to(
                 )
             )
         ),
-        datetime.time(hour=hour)
+        datetime.time(hour=hour), tzinfo=YEKATERINBURG_TIMEZONE
     ) - now_
 
 
