@@ -73,12 +73,11 @@ def today():
     return now().date()
 
 
-def get_timedelta_from_now_to(
-        additional_days_amount, hour, today_=None, now_=None):
+def get_timedelta_from_now_to(additional_days_amount, hour, now_=None):
     now_ = now_ or now()
     return datetime.datetime.combine(
         (
-            today_ or today() + datetime.timedelta(
+            now_.date() + datetime.timedelta(
                 days=(
                     additional_days_amount
                     if now_.hour < hour else
@@ -86,7 +85,8 @@ def get_timedelta_from_now_to(
                 )
             )
         ),
-        datetime.time(hour=hour), tzinfo=YEKATERINBURG_TIMEZONE
+        datetime.time(hour=hour, tzinfo=YEKATERINBURG_TIMEZONE),
+        tzinfo=YEKATERINBURG_TIMEZONE
     ) - now_
 
 
