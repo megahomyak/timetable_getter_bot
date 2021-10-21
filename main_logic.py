@@ -175,7 +175,8 @@ class Bot:
                                         date=timetable_date
                                     )
                                 )
-                            else:
+                                return
+                            elif ignore_cached:
                                 raise TimetableForTomorrowIsntFound
 
     async def check_timetable_periodically_and_send_it(self):
