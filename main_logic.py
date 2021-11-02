@@ -73,28 +73,16 @@ def today():
     return now().date()
 
 
-def get_timedelta_from_now_to(additional_days_amount, hour, now_=None):
-    now_ = now_ or now()
-    return datetime.datetime.combine(
-        (
-            now_.date() + datetime.timedelta(
-                days=(
-                    additional_days_amount
-                    if now_.hour < hour else
-                    additional_days_amount + 1
-                )
-            )
-        ),
-        datetime.time(hour=hour, tzinfo=YEKATERINBURG_TIMEZONE),
-        tzinfo=YEKATERINBURG_TIMEZONE
-    ) - now_
-
-
-async def sleep_to_the_end_of_the_next_school_day(additional_days_amount):
-    await asyncio.sleep(get_timedelta_from_now_to(
-        additional_days_amount=additional_days_amount,
-        hour=MINIMUM_TIMETABLE_SENDING_HOUR
-    ).total_seconds())
+async def sleep_to_the_beginning_of_the_next_school_day():
+    end = (
+        now().replace(hour=MINIMUM_TIMETABLE_SENDING_HOUR)
+        + datetime.timedelta(days=2 if today().weekday() == SATURDAY else 1)
+    )
+    while True:
+        if now() < end:
+            await asyncio.sleep(0)
+        else:
+            return
 
 
 class Bot:
@@ -178,6 +166,8 @@ class Bot:
                                 return
                             elif ignore_cached:
                                 raise TimetableForTomorrowIsntFound
+                if ignore_cached:
+                    raise TimetableForTomorrowIsntFound
 
     async def check_timetable_periodically_and_send_it(self):
         while True:
@@ -187,19 +177,13 @@ class Bot:
                 )
             except TimetableForTomorrowIsntFound:
                 if now().hour > NIGHT_HOUR:
-                    await sleep_to_the_end_of_the_next_school_day(
-                        additional_days_amount=0
-                    )
+                    await sleep_to_the_beginning_of_the_next_school_day()
                 else:
                     await asyncio.sleep(
                         self.config.timetable_checking_delay_in_seconds
                     )
             else:
-                await sleep_to_the_end_of_the_next_school_day(
-                    additional_days_amount=(
-                        1 if today().weekday() == SATURDAY else 0
-                    )
-                )
+                await sleep_to_the_beginning_of_the_next_school_day()
 
     async def update_timetable_and_send_it_to_peer_id(
             self, peer_id: int, ignore_cached: bool):
