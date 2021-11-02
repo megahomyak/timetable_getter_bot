@@ -107,6 +107,7 @@ class Bot:
         ).add_done_callback(
             _future_done_callback
         )
+        print("Starting!")
         await self.vk_client.run_polling()
 
     async def update_timetable(self, ignore_cached: bool):
