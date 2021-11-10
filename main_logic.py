@@ -165,10 +165,8 @@ class Bot:
                                     )
                                 )
                                 return
-                            elif ignore_cached:
-                                raise TimetableForTomorrowIsntFound
-                if ignore_cached:
-                    raise TimetableForTomorrowIsntFound
+                            raise TimetableForTomorrowIsntFound
+                raise TimetableForTomorrowIsntFound
 
     async def check_timetable_periodically_and_send_it(self):
         while True:
