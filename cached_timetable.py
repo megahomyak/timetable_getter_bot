@@ -84,22 +84,18 @@ class TimetableCacher:
 
     async def _download_and_cache_timetable(self, date: datetime.date):
         async with self._timetable_getting_lock:
-            try:
-                timetable = await self._download_timetable(date)
-            except TimetableNotFound:
-                pass
-            else:
-                attachment_string = (
-                    await vkbottle.PhotoMessageUploader(
-                        api=self._vk_client.api
-                    ).upload(timetable)
-                )
-                timetable = Timetable(
-                    attachment_string=attachment_string,
-                    date=date
-                )
-                self._cached_timetable = timetable
-                return timetable
+            timetable = await self._download_timetable(date)
+            attachment_string = (
+                await vkbottle.PhotoMessageUploader(
+                    api=self._vk_client.api
+                ).upload(timetable)
+            )
+            timetable = Timetable(
+                attachment_string=attachment_string,
+                date=date
+            )
+            self._cached_timetable = timetable
+            return timetable
 
     async def _download_timetable(self, date: datetime.date) -> BytesIO:
         next_day_number = date.day
