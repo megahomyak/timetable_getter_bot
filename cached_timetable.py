@@ -94,10 +94,12 @@ class TimetableCacher:
                         api=self._vk_client.api
                     ).upload(timetable)
                 )
-                self._cached_timetable = Timetable(
+                timetable = Timetable(
                     attachment_string=attachment_string,
                     date=date
                 )
+                self._cached_timetable = timetable
+                return timetable
 
     async def _download_timetable(self, date: datetime.date) -> BytesIO:
         next_day_number = date.day
