@@ -9,6 +9,7 @@ import vkbottle.bot
 import vkbottle.dispatch.rules.bot
 from netschoolapi import NetSchoolAPI
 
+import cached_timetable
 from cached_timetable import (
     TimetableCacher, TimetableNotFound, now, today, Timetable
 )
@@ -48,7 +49,8 @@ async def wait_until_minimum_timetable_sending_hour():
         days=2 if date.weekday() == FRIDAY else 1
     )
     await wait_until(datetime.datetime.combine(
-        date, datetime.time(hour=MINIMUM_TIMETABLE_SENDING_HOUR)
+        date, datetime.time(hour=MINIMUM_TIMETABLE_SENDING_HOUR),
+        tzinfo=cached_timetable.YEKATERINBURG_TIMEZONE
     ))
 
 
