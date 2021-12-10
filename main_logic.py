@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import random
 import sys
 
@@ -9,20 +8,14 @@ import vkbottle.bot
 import vkbottle.dispatch.rules.bot
 from netschoolapi import NetSchoolAPI
 
-import cached_timetable
-from cached_timetable import (
-    TimetableCacher, TimetableNotFound, now, today, Timetable
-)
+import time_related_things
+from cached_timetable import TimetableCacher, TimetableNotFound, Timetable
 from config import Config
 
 HELP_MESSAGE = (
     "/помощь (или \"/команды\") - это сообщение\n"
     "/расписание - последнее расписание на сегодня из сетевого города"
 )
-
-
-async def wait_until(time: datetime.datetime):
-    await asyncio.sleep((time - now()).total_seconds())
 
 
 class PeerCheckerRule(vkbottle.dispatch.rules.bot.ABCMessageRule):
@@ -34,24 +27,7 @@ class PeerCheckerRule(vkbottle.dispatch.rules.bot.ABCMessageRule):
         return self.peer_id == message.peer_id
 
 
-MINIMUM_TIMETABLE_SENDING_HOUR = 12
 NIGHT_HOUR = 22
-
-
-FRIDAY = 4
-
-
-async def wait_until_minimum_timetable_sending_hour():
-    date = today()
-    date += datetime.timedelta(
-        # Skipping the saturday because there will be no timetable for sunday on
-        # saturday (because we don't have lessons on sunday)
-        days=2 if date.weekday() == FRIDAY else 1
-    )
-    await wait_until(datetime.datetime.combine(
-        date, datetime.time(hour=MINIMUM_TIMETABLE_SENDING_HOUR),
-        tzinfo=cached_timetable.YEKATERINBURG_TIMEZONE
-    ))
 
 
 class Bot:
@@ -79,8 +55,11 @@ class Bot:
             try:
                 timetable = await self.timetable_cacher.download()
             except TimetableNotFound:
-                if now().hour > NIGHT_HOUR:
-                    await wait_until_minimum_timetable_sending_hour()
+                if time_related_things.now().hour > NIGHT_HOUR:
+                    await (
+                        time_related_things
+                        .wait_until_minimum_timetable_sending_hour()
+                    )
                 else:
                     await asyncio.sleep(
                         self.config.timetable_checking_delay_in_seconds
@@ -89,7 +68,10 @@ class Bot:
                 await self.send_timetable_to_peer_id(
                     timetable, self.config.class_chat_peer_id
                 )
-                await wait_until_minimum_timetable_sending_hour()
+                await (
+                    time_related_things
+                    .wait_until_minimum_timetable_sending_hour()
+                )
 
     async def send_timetable_to_peer_id(
             self, timetable: Timetable, peer_id: int):

@@ -6,35 +6,15 @@ from io import BytesIO
 from typing import Optional
 
 import netschoolapi
-import pytz
 import vkbottle
 from PIL import Image as PILImageModule
 
+import time_related_things
 from image_cropper import ImageCropper
-
-YEKATERINBURG_TIMEZONE = pytz.timezone("Asia/Yekaterinburg")
-
-SATURDAY = 5
 
 
 class TimetableNotFound(Exception):
     pass
-
-
-def now():
-    return datetime.datetime.now(tz=YEKATERINBURG_TIMEZONE)
-
-
-def today():
-    return now().date()
-
-
-def get_next_school_day_date():
-    today_ = today()
-    return today_ + datetime.timedelta(
-        # Skipping the sunday
-        days=2 if today_.weekday() == SATURDAY else 1
-    )
 
 
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
@@ -61,7 +41,7 @@ class TimetableCacher:
     async def get_from_cache_or_download(
             self, date: datetime.date = None):
         if date is None:
-            date = today()
+            date = time_related_things.today()
         if self._cache_is_valid(date):
             return self._cached_timetable
         try:
@@ -73,7 +53,7 @@ class TimetableCacher:
 
     async def download(self, date: datetime.date = None):
         return await self._download_and_cache_timetable(
-            date or get_next_school_day_date()
+            date or time_related_things.get_next_school_day_date()
         )
 
     def _cache_is_valid(self, expected_date: datetime.date):
