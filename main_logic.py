@@ -1,7 +1,9 @@
 import asyncio
 import datetime
 import random
+import sys
 
+import loguru
 import vkbottle
 import vkbottle.bot
 import vkbottle.dispatch.rules.bot
@@ -117,6 +119,8 @@ class Bot:
 
 async def main():
     config = Config.make_from_file("config.json")
+    loguru.logger.remove()
+    loguru.logger.add(sys.stdout, level="WARNING")
     netschoolapi_client = NetSchoolAPI(url="https://sgo.edu-74.ru/")
     await netschoolapi_client.login(
         user_name=config.sgo_username, password=config.sgo_password,
