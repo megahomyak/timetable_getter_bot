@@ -5,7 +5,6 @@ import sys
 import loguru
 import vkbottle
 import vkbottle.bot
-import vkbottle.dispatch.rules.bot
 from netschoolapi import NetSchoolAPI
 
 import time_related_things
@@ -18,7 +17,7 @@ HELP_MESSAGE = (
 )
 
 
-class PeerCheckerRule(vkbottle.dispatch.rules.bot.ABCMessageRule):
+class PeerCheckerRule(vkbottle.ABCRule):
 
     def __init__(self, peer_id: int):
         self.peer_id = peer_id
