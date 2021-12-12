@@ -40,6 +40,6 @@ async def wait_until_minimum_timetable_sending_hour():
         days=2 if date.weekday() == FRIDAY else 1
     )
     await wait_until(datetime.datetime.combine(
-        date, datetime.time(hour=MINIMUM_TIMETABLE_SENDING_HOUR),
+        date=date, time=datetime.time(hour=MINIMUM_TIMETABLE_SENDING_HOUR),
         tzinfo=YEKATERINBURG_TIMEZONE
     ))
