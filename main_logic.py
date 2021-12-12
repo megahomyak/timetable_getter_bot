@@ -67,10 +67,7 @@ class Bot:
                 await self.send_timetable_to_peer_id(
                     timetable, self.config.class_chat_peer_id
                 )
-                await (
-                    time_related_things
-                    .wait_until_minimum_timetable_sending_hour()
-                )
+                await time_related_things.wait_until_next_school_day()
 
     async def send_timetable_to_peer_id(
             self, timetable: Timetable, peer_id: int):

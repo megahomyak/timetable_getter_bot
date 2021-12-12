@@ -5,7 +5,6 @@ import pytz
 
 YEKATERINBURG_TIMEZONE = pytz.timezone("Asia/Yekaterinburg")
 
-FRIDAY = 4
 SATURDAY = 5
 
 
@@ -17,29 +16,38 @@ def today():
     return now().date()
 
 
-def get_next_school_day_date():
-    today_ = today()
-    return today_ + datetime.timedelta(
-        # Skipping the sunday
-        days=2 if today_.weekday() == SATURDAY else 1
-    )
-
-
 async def wait_until(time: datetime.datetime):
     await asyncio.sleep((time - now()).total_seconds())
+
+
+def get_next_school_day_date():
+    date = today()
+    return date + datetime.timedelta(
+        # Skipping the sunday because we don't have classes on sunday
+        days=2 if date.weekday() == SATURDAY else 1
+    )
 
 
 MINIMUM_TIMETABLE_SENDING_HOUR = 12
 
 
-async def wait_until_minimum_timetable_sending_hour():
-    date = today()
-    date += datetime.timedelta(
-        # Skipping the saturday because there will be no timetable for sunday on
-        # saturday (because we don't have lessons on sunday)
-        days=2 if date.weekday() == FRIDAY else 1
-    )
-    await wait_until(datetime.datetime.combine(
+async def _wait_until_minimum_timetable_sending_hour_on_some_day(
+        date: datetime.date):
+    date = datetime.datetime.combine(
         date=date, time=datetime.time(hour=MINIMUM_TIMETABLE_SENDING_HOUR),
         tzinfo=YEKATERINBURG_TIMEZONE
-    ))
+    )
+    await wait_until(date)
+
+
+async def wait_until_minimum_timetable_sending_hour():
+    await _wait_until_minimum_timetable_sending_hour_on_some_day(
+        date=today() + datetime.timedelta(days=1)
+    )
+
+
+async def wait_until_next_school_day():
+    await _wait_until_minimum_timetable_sending_hour_on_some_day(
+        # Sleeping through the sunday
+        date=get_next_school_day_date()
+    )

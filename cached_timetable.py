@@ -38,22 +38,20 @@ class TimetableCacher:
         self._timetable_getting_lock = asyncio.Lock()
         self._cached_timetable: Optional[Timetable] = None
 
-    async def get_from_cache_or_download(
-            self, date: datetime.date = None):
-        if date is None:
-            date = time_related_things.today()
-        if self._cache_is_valid(date):
+    async def get_from_cache_or_download(self):
+        next_school_day = time_related_things.get_next_school_day_date()
+        if self._cache_is_valid(next_school_day):
             return self._cached_timetable
         try:
-            return await self._download_and_cache_timetable(date)
+            return await self._download_and_cache_timetable(next_school_day)
         except TimetableNotFound:
             if self._cached_timetable is None:
                 raise TimetableNotFound
             return self._cached_timetable
 
-    async def download(self, date: datetime.date = None):
+    async def download(self):
         return await self._download_and_cache_timetable(
-            date or time_related_things.get_next_school_day_date()
+            time_related_things.get_next_school_day_date()
         )
 
     def _cache_is_valid(self, expected_date: datetime.date):
