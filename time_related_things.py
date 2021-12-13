@@ -28,7 +28,7 @@ def get_next_school_day_date():
     )
 
 
-MINIMUM_TIMETABLE_SENDING_HOUR = 12
+MINIMUM_TIMETABLE_SENDING_HOUR = 10
 
 
 async def _wait_until_minimum_timetable_sending_hour_on_some_day(
