@@ -1,100 +1,166 @@
 import asyncio
-import random
+import os
+import re
 import sys
+from dataclasses import dataclass
+from io import BytesIO
+from typing import Iterable
 
+import PIL.Image
+import httpx
 import loguru
+import netschoolapi.schemas
 import vkbottle
-import vkbottle.bot
 from netschoolapi import NetSchoolAPI
 
+import image_cropper
 import time_related_things
-from cached_timetable import TimetableCacher, TimetableNotFound, Timetable
 from config import Config
+from looped_two_ways_iterator import LoopedTwoWaysIterator
+from timetable_days_cacher import (
+    AbstractTimetableDaysCacher, TimetableDaysCacher
+)
 
-HELP_MESSAGE = (
-    "/помощь (или \"/команды\") - это сообщение\n"
-    "/расписание - последнее расписание на сегодня из сетевого города"
+TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
+    r"расписание для 5-11 классов на (?P<month_day_number>\d+)",
+    flags=re.IGNORECASE
 )
 
 
-class PeerCheckerRule(vkbottle.ABCRule):
-
-    def __init__(self, peer_id: int):
-        self.peer_id = peer_id
-
-    async def check(self, message: vkbottle.bot.Message) -> bool:
-        return self.peer_id == message.peer_id
-
-
-NIGHT_HOUR = 22
+@dataclass
+class Timetable:
+    attachment: netschoolapi.schemas.Attachment
 
 
 class Bot:
 
     def __init__(
-            self, config: Config, vk_client: vkbottle.Bot,
-            netschoolapi_client: NetSchoolAPI):
-        # noinspection PyTypeChecker
-        # because Set[int] is also applicable for FromPeerRule
-        vk_client.on.message(PeerCheckerRule(config.class_chat_peer_id))(
-            self.handle_message
+            self, config: Config, vk_group_client: vkbottle.Bot,
+            vk_group_id: int, vk_user_client: vkbottle.User,
+            netschoolapi_client: NetSchoolAPI,
+            timetable_days_cacher: AbstractTimetableDaysCacher):
+        self._vk_group_client = vk_group_client
+        self._vk_group_id = vk_group_id
+        self._vk_group_client = vk_user_client
+        self._config = config
+        self._netschoolapi_client = netschoolapi_client
+        self._timetable_days_cacher = timetable_days_cacher
+        self._timetable_downloading_and_days_caching_lock = asyncio.Lock()
+
+    @classmethod
+    async def new(
+            cls, config: Config, vk_group_client: vkbottle.Bot,
+            vk_user_client: vkbottle.User,
+            netschoolapi_client: NetSchoolAPI,
+            timetable_days_cacher: AbstractTimetableDaysCacher):
+        vk_group_id = -(await vk_group_client.api.groups.get_by_id())[0].id
+        return cls(
+            config=config, vk_group_client=vk_group_client,
+            vk_group_id=vk_group_id, vk_user_client=vk_user_client,
+            netschoolapi_client=netschoolapi_client,
+            timetable_days_cacher=timetable_days_cacher
         )
-        self.vk_client = vk_client
-        self.config = config
-        self.netschoolapi_client = netschoolapi_client
-        self.timetable_cacher = TimetableCacher(netschoolapi_client, vk_client)
 
     async def run(self):
-        asyncio.create_task(self.check_timetable_periodically_and_send_it())
         print("Starting!")
-        await self.vk_client.run_polling()
-
-    async def check_timetable_periodically_and_send_it(self):
-        while True:
-            try:
-                timetable = await self.timetable_cacher.download()
-            except TimetableNotFound:
-                if time_related_things.now().hour > NIGHT_HOUR:
-                    await (
-                        time_related_things
-                        .wait_until_minimum_timetable_sending_hour()
-                    )
-                else:
-                    await asyncio.sleep(
-                        self.config.timetable_checking_delay_in_seconds
-                    )
-            else:
-                await self.send_timetable_to_peer_id(
-                    timetable, self.config.class_chat_peer_id
-                )
-                await time_related_things.wait_until_next_school_day()
-
-    async def send_timetable_to_peer_id(
-            self, timetable: Timetable, peer_id: int):
-        await self.vk_client.api.messages.send(
-            attachment=timetable.attachment_string,
-            message="Расписание на " + timetable.date.strftime("%d.%m.%Y"),
-            peer_id=peer_id,
-            random_id=random.randint(-1_000_000, 1_000_000)
+        timetable_weekdays_iterator = LoopedTwoWaysIterator(
+            self._config.timetable_weekdays
         )
+        current_weekday = time_related_things.now().weekday()
+        try:
+            while timetable_weekdays_iterator.step_forward() <= current_weekday:
+                # Skipping all the days that go before current day (and the
+                # current day, if present)
+                pass
+        except StopIteration:
+            pass
+        else:
+            timetable_weekdays_iterator.step_back()
+        # Now this iterator will yield the day that goes after current (maybe
+        # even from the next week, if StopIteration was raised)
+        del current_weekday
+        for next_timetable_weekday in timetable_weekdays_iterator:
+            # SLEEP SCHEDULE:
+            # Sleep until the next timetable day if it is late.
+            # Sleep until the next timetable day if timetables were fetched.
+            # Sleep for timetable checking delay otherwise.
+            sleep_to_next_timetable_day = False
+            try:
+                timetables = await self._download_new_timetables()
+            except httpx.HTTPError:
+                pass
+            else:
+                await self._send_timetables(timetables)
+                sleep_to_next_timetable_day = True
+            now = time_related_things.now()
+            if now.hour >= self._config.maximum_timetable_sending_hour:
+                sleep_to_next_timetable_day = True
+            if sleep_to_next_timetable_day:
+                await time_related_things.sleep_to_next_timetable_day(
+                    next_timetable_weekday=next_timetable_weekday,
+                    end_hour=self._config.minimum_timetable_sending_hour,
+                    beginning_datetime=now
+                )
+            else:
+                await asyncio.sleep(
+                    self._config.timetable_checking_delay_in_seconds
+                )
 
-    async def handle_message(self, message: vkbottle.bot.Message):
-        if message.text.startswith("/"):
-            text = message.text[1:].casefold()
-            if text == "расписание":
-                try:
-                    timetable = (
-                        await self.timetable_cacher.get_from_cache_or_download()
+    async def _send_timetables(self, timetables: Iterable[Timetable]):
+        for timetable in timetables:
+            post_title, file_extension = (
+                os.path.splitext(timetable.attachment.name)
+            )
+            image_format = (
+                file_extension[1:]  # Removing the dot at the beginning
+            )
+            if image_format == "jpg":
+                image_format = "jpeg"
+            timetable_image_as_bytes = await (
+                self._netschoolapi_client.download_attachment_as_bytes(
+                    attachment=timetable.attachment
+                )
+            )
+            cropped_timetable_image_buffer = BytesIO()
+            image_cropper.crop_white_margins(
+                PIL.Image.open(timetable_image_as_bytes).convert("RGB")
+            ).save(cropped_timetable_image_buffer, format=image_format)
+            vk_attachment_string: str = (
+                await vkbottle.PhotoWallUploader(
+                    api=self._vk_group_client.api
+                ).upload(cropped_timetable_image_buffer)
+            )
+            await self._vk_group_client.api.wall.post(
+                owner_id=self._vk_group_id,
+                from_group=True,
+                message=post_title,
+                attachments=[vk_attachment_string]
+            )
+
+    async def _download_new_timetables(self) -> Iterable[Timetable]:
+        """
+        Get all the timetables. If some of them are not in self._timetable_days,
+        it means that they are new and they should be added to the result. After
+        processing all of the timetables, set self._timetable_days to
+        new_timetable_days
+        """
+        async with self._timetable_downloading_and_days_caching_lock:
+            timetables = []
+            old_timetable_days = self._timetable_days_cacher.get_days()
+            new_timetable_days = set()
+            for announcement in await self._netschoolapi_client.announcements():
+                for attachment in announcement.attachments:
+                    match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.match(
+                        attachment.name
                     )
-                except TimetableNotFound:
-                    await message.answer("Расписания пока нет!")
-                else:
-                    await self.send_timetable_to_peer_id(
-                        timetable=timetable,
-                        peer_id=message.peer_id
-                    )
-            elif text in ("помощь", "команды"):
-                await message.answer(HELP_MESSAGE)
+                    if match:
+                        # We got a timetable!
+                        timetable_day = int(match.group("month_day_number"))
+                        new_timetable_days.add(timetable_day)
+                        if timetable_day not in old_timetable_days:
+                            timetables.append(Timetable(attachment))
+            self._timetable_days_cacher.set_days(new_timetable_days)
+            return timetables
 
 
 async def main():
@@ -106,12 +172,17 @@ async def main():
         user_name=config.sgo_username, password=config.sgo_password,
         school=config.school_name
     )
-    bot = Bot(
+    bot = await Bot.new(
         config=config,
-        vk_client=vkbottle.Bot(token=config.vk_bot_token),
-        netschoolapi_client=netschoolapi_client
+        vk_group_client=vkbottle.Bot(token=config.vk_group_token),
+        vk_user_client=vkbottle.User(token=config.vk_user_token),
+        netschoolapi_client=netschoolapi_client,
+        timetable_days_cacher=TimetableDaysCacher.from_file(
+            "timetable_days.txt"
+        )
     )
     await bot.run()
 
 
-asyncio.get_event_loop().run_until_complete(main())
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())

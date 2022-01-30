@@ -1,3 +1,5 @@
 .idea
 timetable_getter_bot.iml
 config.json
+.pytest_cache
+timetable_days.txt

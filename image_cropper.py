@@ -1,128 +1,49 @@
-import functools
+from typing import Iterable
 
-from PIL import Image as PILImageModule
-
-BLACK = (0, 0, 0)
+import PIL.Image
 
 
-def color_looks_like(first_color, second_color):
+def color_looks_like(first_color: Iterable[int], second_color: Iterable[int]):
     return all(
         abs(first_channel - second_channel) < 20
         for first_channel, second_channel in zip(first_color, second_color)
     )
 
 
-class _NowhereToGo(Exception):
-    pass
-
-
-def _increment_y(coordinates, image):
-    coordinates[1] += 1
-    if coordinates[1] == image.width:
-        coordinates[1] -= 1
-        raise _NowhereToGo
-
-
-def _increment_x(coordinates, image):
-    coordinates[0] += 1
-    if coordinates[0] == image.height:
-        coordinates[0] -= 1
-        raise _NowhereToGo
-
-
-# noinspection PyUnusedLocal
-def _decrement_y(coordinates, image):
-    if coordinates[1] == 0:
-        raise _NowhereToGo
-    else:
-        coordinates[1] -= 1
-
-
-# noinspection PyUnusedLocal
-def _decrement_x(coordinates, image):
-    if coordinates[0] == 0:
-        raise _NowhereToGo
-    else:
-        coordinates[0] -= 1
-
-
-class ImageCropper:
-
-    def __init__(self, image: PILImageModule.Image):
-        if image.mode != "RGB":
-            image = image.convert("RGB")
-        self.image = image
-        self.coordinates = [5, image.height - 1]
-        (
-            self.go_up_while_color_is_black,
-            self.go_up_until_color_is_black,
-            self.go_left_while_color_is_black,
-            self.go_left_until_color_is_black,
-            self.go_down_while_color_is_black,
-            self.go_down_until_color_is_black,
-            self.go_right_while_color_is_black,
-            self.go_right_until_color_is_black
-        ) = (
-            functools.partial(fn, functools.partial(action))
-            for fn, action in (
-                (self._go_while_black, _decrement_y),
-                (self._go_until_black, _decrement_y),
-                (self._go_while_black, _decrement_x),
-                (self._go_until_black, _decrement_x),
-                (self._go_while_black, _increment_y),
-                (self._go_until_black, _increment_y),
-                (self._go_while_black, _increment_x),
-                (self._go_until_black, _increment_x)
-            )
-        )
-
-    def _go_while_black(self, action):
-        try:
-            while color_looks_like(self._get_current_pixel(), BLACK):
-                action(self.coordinates, self.image)
-        except _NowhereToGo:
-            pass
-
-    def _get_current_pixel(self):
-        return self.image.getpixel(tuple(self.coordinates))
-
-    def _go_until_black(self, action):
-        try:
-            while not color_looks_like(self._get_current_pixel(), BLACK):
-                action(self.coordinates, self.image)
-        except _NowhereToGo:
-            pass
-
-    def _go_one_row_up_and_get_row_height(self):
-        row_lower_border = self.coordinates[1]
-        self.go_up_until_color_is_black()
-        row_upper_border = self.coordinates[1] + 1
-        return row_lower_border - row_upper_border
-
-    def crop(self):
-        self.go_up_until_color_is_black()
-        self.go_up_while_color_is_black()
-        lower_border = self.coordinates[1]
-        self.go_right_until_color_is_black()
-        self.go_right_while_color_is_black()
-        max_common_row_height = self._go_one_row_up_and_get_row_height() * 2
-        self.go_up_while_color_is_black()
-        while self._go_one_row_up_and_get_row_height() < max_common_row_height:
-            self.go_up_while_color_is_black()
-        old_coordinates = self.coordinates.copy()
-        self.go_left_while_color_is_black()
-        left_border = self.coordinates[0] + 1
-        self.coordinates = old_coordinates
-        self.coordinates[1] += 1
-        upper_border = self.coordinates[1]
-        for _ in range(3):
-            self.go_right_until_color_is_black()
-            self.go_right_while_color_is_black()
-        self.go_right_until_color_is_black()
-        right_border = self.coordinates[0] - 1
-        return self.image.crop((
-            left_border,
-            upper_border,
-            right_border,
-            lower_border
-        ))
+def crop_white_margins(image: PIL.Image.Image):
+    """
+    Crops white margins at the bottom and on the right of the given image.
+    Image should be in RGB mode.
+    """
+    content_end_y = 0
+    content_end_x = 0
+    #   ########^^
+    #   ####^###^^
+    #   ^^##^###^^
+    # > ^^^^^^^^^^
+    #
+    #   ^
+    # Go from bottom to top, and if one non-white pixel was encountered, it
+    # means that the content for this column ends here. Just take a
+    # maximum value of these numbers and here it is, the content's real end
+    for x in range(image.width):
+        y = image.height - 1
+        # Go until we meet some non-white pixel
+        while not color_looks_like(image.getpixel((x, y)), (0, 0, 0)):
+            if y == 0:
+                # All of the pixels in this column were white, so this column is
+                # empty
+                break
+            y -= 1
+        else:
+            # Non-white pixel was found in this column, so this column
+            # definitely has some content
+            content_end_x = x
+            if y > content_end_y:
+                content_end_y = y
+    return image.crop((
+        0,  # Left border
+        0,  # Upper border
+        content_end_x,  # Right border
+        content_end_y  # Lower border
+    ))
