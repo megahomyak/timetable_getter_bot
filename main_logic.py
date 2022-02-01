@@ -66,19 +66,10 @@ class Bot:
         timetable_weekdays_iterator = LoopedTwoWaysIterator(
             self._config.timetable_weekdays
         )
-        current_weekday = time_related_things.now().weekday()
-        try:
-            while timetable_weekdays_iterator.step_forward() <= current_weekday:
-                # Skipping all the days that go before current day (and the
-                # current day, if present)
-                pass
-        except StopIteration:
-            pass
-        else:
-            timetable_weekdays_iterator.step_back()
-        # Now this iterator will yield the day that goes after current (maybe
-        # even from the next week, if StopIteration was raised)
-        del current_weekday
+        time_related_things.roll_weekdays_iterator(
+            timetable_weekdays_iterator,
+            current_weekday=time_related_things.now().weekday()
+        )
         for next_timetable_weekday in timetable_weekdays_iterator:
             # SLEEP SCHEDULE:
             # Sleep until the next timetable day if it is late.
@@ -98,8 +89,8 @@ class Bot:
             if sleep_to_next_timetable_day:
                 await time_related_things.sleep_to_next_timetable_day(
                     next_timetable_weekday=next_timetable_weekday,
-                    end_hour=self._config.minimum_timetable_sending_hour,
-                    beginning_datetime=now
+                    sleep_end_hour=self._config.minimum_timetable_sending_hour,
+                    initial_datetime=now
                 )
             else:
                 await asyncio.sleep(
