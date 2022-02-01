@@ -2,8 +2,8 @@ import datetime
 
 import pytest
 
-import time_related_things
-from looped_two_ways_iterator import LoopedTwoWaysIterator
+from src import time_related_things
+from src.looped_two_ways_iterator import LoopedTwoWaysIterator
 
 
 @pytest.mark.parametrize(

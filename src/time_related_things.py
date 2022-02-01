@@ -3,7 +3,7 @@ import datetime
 
 import pytz
 
-from looped_two_ways_iterator import LoopedTwoWaysIterator
+from src.looped_two_ways_iterator import LoopedTwoWaysIterator
 
 YEKATERINBURG_TIMEZONE = pytz.timezone("Asia/Yekaterinburg")
 

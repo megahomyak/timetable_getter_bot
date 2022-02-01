@@ -1,25 +1,21 @@
 import asyncio
 import os
 import re
-import sys
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Iterable
 
 import PIL.Image
 import httpx
-import loguru
 import netschoolapi.schemas
 import vkbottle
 from netschoolapi import NetSchoolAPI
 
-import image_cropper
-import time_related_things
-from config import Config
-from looped_two_ways_iterator import LoopedTwoWaysIterator
-from timetable_days_cacher import (
-    AbstractTimetableDaysCacher, TimetableDaysCacher
-)
+from src import image_cropper
+from src import time_related_things
+from src.config import Config
+from src.looped_two_ways_iterator import LoopedTwoWaysIterator
+from src.timetable_days_cacher import AbstractTimetableDaysCacher
 
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
     r"расписание для 5-11 классов на (?P<month_day_number>\d+)",
@@ -152,28 +148,3 @@ class Bot:
                             timetables.append(Timetable(attachment))
             self._timetable_days_cacher.set_days(new_timetable_days)
             return timetables
-
-
-async def main():
-    config = Config.make_from_file("config.json")
-    loguru.logger.remove()
-    loguru.logger.add(sys.stdout, level="WARNING")
-    netschoolapi_client = NetSchoolAPI(url="https://sgo.edu-74.ru/")
-    await netschoolapi_client.login(
-        user_name=config.sgo_username, password=config.sgo_password,
-        school=config.school_name
-    )
-    bot = await Bot.new(
-        config=config,
-        vk_group_client=vkbottle.Bot(token=config.vk_group_token),
-        vk_user_client=vkbottle.User(token=config.vk_user_token),
-        netschoolapi_client=netschoolapi_client,
-        timetable_days_cacher=TimetableDaysCacher.from_file(
-            "timetable_days.txt"
-        )
-    )
-    await bot.run()
-
-
-if __name__ == '__main__':
-    asyncio.get_event_loop().run_until_complete(main())
