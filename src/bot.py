@@ -67,31 +67,33 @@ class Bot:
             current_weekday=time_related_things.now().weekday()
         )
         for next_timetable_weekday in timetable_weekdays_iterator:
-            # SLEEP SCHEDULE:
-            # Sleep until the next timetable day if it is late.
-            # Sleep until the next timetable day if timetables were fetched.
-            # Sleep for timetable checking delay otherwise.
-            sleep_to_next_timetable_day = False
-            try:
-                timetables = await self._download_new_timetables()
-            except httpx.HTTPError:
-                pass
-            else:
-                await self._send_timetables(timetables)
-                sleep_to_next_timetable_day = True
-            now = time_related_things.now()
-            if now.hour >= self._config.maximum_timetable_sending_hour:
-                sleep_to_next_timetable_day = True
-            if sleep_to_next_timetable_day:
-                await time_related_things.sleep_to_next_timetable_day(
-                    next_timetable_weekday=next_timetable_weekday,
-                    sleep_end_hour=self._config.minimum_timetable_sending_hour,
-                    initial_datetime=now
-                )
-            else:
-                await asyncio.sleep(
-                    self._config.timetable_checking_delay_in_seconds
-                )
+            while True:
+                # SLEEP SCHEDULE:
+                # Sleep until the next timetable day if it is late.
+                # Sleep until the next timetable day if timetables were fetched.
+                # Sleep for timetable checking delay otherwise.
+                try:
+                    timetables = await self._download_new_timetables()
+                except httpx.HTTPError:
+                    pass
+                else:
+                    await self._send_timetables(timetables)
+                    now = time_related_things.now()
+                    break
+                now = time_related_things.now()
+                if now.hour >= self._config.maximum_timetable_sending_hour:
+                    break
+                else:
+                    await asyncio.sleep(
+                        self._config.timetable_checking_delay_in_seconds
+                    )
+            await time_related_things.sleep_to_next_timetable_day(
+                next_timetable_weekday=next_timetable_weekday,
+                sleep_end_hour=(
+                    self._config.minimum_timetable_sending_hour
+                ),
+                initial_datetime=now
+            )
 
     async def _send_timetables(self, timetables: Iterable[Timetable]):
         for timetable in timetables:
