@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 
 import pytz
@@ -36,15 +35,6 @@ def get_next_timetable_search_beginning_date(
         microsecond=0
     )
     return future
-
-
-async def sleep_to_next_timetable_day(
-        next_timetable_weekday: int, sleep_end_hour: int,
-        initial_datetime: datetime.datetime):
-    future = get_next_timetable_search_beginning_date(
-        next_timetable_weekday, sleep_end_hour, initial_datetime
-    )
-    await asyncio.sleep((future - initial_datetime).total_seconds())
 
 
 def roll_weekdays_iterator(

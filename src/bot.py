@@ -34,7 +34,8 @@ class Bot:
             self, config: Config, vk_group_client: vkbottle.Bot,
             vk_group_id: int, vk_user_client: vkbottle.User,
             netschoolapi_client: NetSchoolAPI,
-            timetable_days_cacher: AbstractTimetableDaysCacher):
+            timetable_days_cacher: AbstractTimetableDaysCacher,
+            do_logging: bool):
         self._vk_group_client = vk_group_client
         self._vk_group_id = vk_group_id
         self._vk_group_client = vk_user_client
@@ -42,19 +43,22 @@ class Bot:
         self._netschoolapi_client = netschoolapi_client
         self._timetable_days_cacher = timetable_days_cacher
         self._timetable_downloading_and_days_caching_lock = asyncio.Lock()
+        self._do_logging = do_logging
 
     @classmethod
     async def new(
             cls, config: Config, vk_group_client: vkbottle.Bot,
             vk_user_client: vkbottle.User,
             netschoolapi_client: NetSchoolAPI,
-            timetable_days_cacher: AbstractTimetableDaysCacher):
+            timetable_days_cacher: AbstractTimetableDaysCacher,
+            do_logging: bool):
         vk_group_id = -(await vk_group_client.api.groups.get_by_id())[0].id
         return cls(
             config=config, vk_group_client=vk_group_client,
             vk_group_id=vk_group_id, vk_user_client=vk_user_client,
             netschoolapi_client=netschoolapi_client,
-            timetable_days_cacher=timetable_days_cacher
+            timetable_days_cacher=timetable_days_cacher,
+            do_logging=do_logging
         )
 
     async def run(self):
@@ -73,27 +77,44 @@ class Bot:
                 # Sleep until the next timetable day if timetables were fetched.
                 # Sleep for timetable checking delay otherwise.
                 try:
+                    if self._do_logging:
+                        print(
+                            f"Timetables before receiving new timetables: "
+                            f"{self._timetable_days_cacher.get_days()}"
+                        )
                     timetables = await self._download_new_timetables()
                 except httpx.HTTPError:
                     pass
                 else:
+                    if self._do_logging:
+                        print(
+                            f"Timetables after receiving new timetables: "
+                            f"{self._timetable_days_cacher.get_days()}"
+                        )
                     await self._send_timetables(timetables)
                     now = time_related_things.now()
+                    if self._do_logging:
+                        print(f"Sent timetables: {timetables} at {now}")
                     break
                 now = time_related_things.now()
                 if now.hour >= self._config.maximum_timetable_sending_hour:
                     break
                 else:
+                    if self._do_logging:
+                        print(f"Short sleep (now is {now})")
                     await asyncio.sleep(
                         self._config.timetable_checking_delay_in_seconds
                     )
-            await time_related_things.sleep_to_next_timetable_day(
-                next_timetable_weekday=next_timetable_weekday,
-                sleep_end_hour=(
-                    self._config.minimum_timetable_sending_hour
-                ),
-                initial_datetime=now
+            future = (
+                time_related_things.get_next_timetable_search_beginning_date(
+                    next_timetable_weekday=next_timetable_weekday,
+                    sleep_end_hour=self._config.minimum_timetable_sending_hour,
+                    initial_date=now
+                )
             )
+            if self._do_logging:
+                print(f"Long sleep until {future} (now is {now})")
+            await asyncio.sleep((future - now).total_seconds())
 
     async def _send_timetables(self, timetables: Iterable[Timetable]):
         for timetable in timetables:
