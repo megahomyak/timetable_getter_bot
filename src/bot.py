@@ -91,11 +91,15 @@ class Bot:
                             f"Timetables after receiving new timetables: "
                             f"{self._timetable_days_cacher.get_days()}"
                         )
-                    await self._send_timetables(timetables)
-                    now = time_related_things.now()
-                    if self._do_logging:
-                        print(f"Sent timetables: {timetables} at {now}")
-                    break
+                    if timetables:
+                        await self._send_timetables(timetables)
+                        now = time_related_things.now()
+                        if self._do_logging:
+                            print(f"Sent timetables: {timetables} at {now}")
+                        break
+                    else:
+                        if self._do_logging:
+                            print("=> no new timetables found")
                 now = time_related_things.now()
                 if now.hour >= self._config.maximum_timetable_sending_hour:
                     break
