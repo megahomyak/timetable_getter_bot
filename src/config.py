@@ -14,6 +14,7 @@ class Config:
     minimum_timetable_sending_hour: int
     maximum_timetable_sending_hour: int
     timetable_weekdays: List[int]
+    do_logging: bool
 
     @classmethod
     def make_from_file(cls, filename: str, encoding="utf-8"):
