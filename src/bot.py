@@ -65,6 +65,7 @@ class Bot:
         )
         if config.print_incoming_messages:
             vk_group_client.on.message()(bot_instance._handle_new_message)
+            asyncio.create_task(vk_group_client.run_polling())
         return bot_instance
 
     # noinspection PyMethodMayBeStatic
