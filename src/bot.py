@@ -111,11 +111,24 @@ class Bot:
                         if self._do_logging:
                             print("=> no new timetables found")
                 now = time_related_things.now()
-                if (
-                    now.hour >= self._config.maximum_timetable_sending_hour
-                    or now.hour < self._config.minimum_timetable_sending_hour
-                ):
+                if now.hour >= self._config.maximum_timetable_sending_hour:
                     break
+                elif now.hour < self._config.minimum_timetable_sending_hour:
+                    if self._do_logging:
+                        print(
+                            f"Sleeping to "
+                            f"{self._config.minimum_timetable_sending_hour} "
+                            f"hour (now is {now})"
+                        )
+                    future = now.replace(
+                        hour=self._config.minimum_timetable_sending_hour,
+                        minute=0,
+                        second=0,
+                        microsecond=0
+                    )
+                    await asyncio.sleep(
+                        (future - now).total_seconds()
+                    )
                 else:
                     if self._do_logging:
                         print(f"Short sleep (now is {now})")
