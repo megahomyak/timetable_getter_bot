@@ -111,7 +111,10 @@ class Bot:
                         if self._do_logging:
                             print("=> no new timetables found")
                 now = time_related_things.now()
-                if now.hour >= self._config.maximum_timetable_sending_hour:
+                if (
+                    now.hour >= self._config.maximum_timetable_sending_hour
+                    or now.hour < self._config.minimum_timetable_sending_hour
+                ):
                     break
                 else:
                     if self._do_logging:
