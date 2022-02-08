@@ -25,6 +25,7 @@ TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
 
 @dataclass
 class Timetable:
+    announcement_text: str
     attachment: netschoolapi.schemas.Attachment
 
 
@@ -147,7 +148,10 @@ class Bot:
             await self._vk_group_client.api.wall.post(
                 owner_id=self._vk_group_id,
                 from_group=True,
-                message=post_title,
+                message=post_title + (
+                    f"\n\nТекст объявления: {timetable.announcement_text}"
+                    if timetable.announcement_text else ""
+                ),
                 attachments=[vk_attachment_string]
             )
 
@@ -172,6 +176,9 @@ class Bot:
                         timetable_day = int(match.group("month_day_number"))
                         new_timetable_days.add(timetable_day)
                         if timetable_day not in old_timetable_days:
-                            timetables.append(Timetable(attachment))
+                            timetables.append(Timetable(
+                                announcement_text=announcement.content,
+                                attachment=attachment
+                            ))
             self._timetable_days_cacher.set_days(new_timetable_days)
             return timetables
