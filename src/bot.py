@@ -1,15 +1,18 @@
 import asyncio
 import os
+import random
 import re
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Iterable
+from typing import Sequence, List
 
 import PIL.Image
 import httpx
 import netschoolapi.schemas
 import vkbottle
 from netschoolapi import NetSchoolAPI
+from vkbottle.bot import Message
+from vkbottle_types.objects import MessagesSendUserIdsResponseItem
 
 from src import image_cropper
 from src import time_related_things
@@ -51,16 +54,22 @@ class Bot:
             cls, config: Config, vk_group_client: vkbottle.Bot,
             vk_user_client: vkbottle.User,
             netschoolapi_client: NetSchoolAPI,
-            timetable_days_cacher: AbstractTimetableDaysCacher,
-            do_logging: bool):
+            timetable_days_cacher: AbstractTimetableDaysCacher):
         vk_group_id = -(await vk_group_client.api.groups.get_by_id())[0].id
-        return cls(
+        bot_instance = cls(
             config=config, vk_group_client=vk_group_client,
             vk_group_id=vk_group_id, vk_user_client=vk_user_client,
             netschoolapi_client=netschoolapi_client,
             timetable_days_cacher=timetable_days_cacher,
-            do_logging=do_logging
+            do_logging=config.do_logging
         )
+        if config.print_incoming_messages:
+            vk_group_client.on.message()(bot_instance._handle_new_message)
+        return bot_instance
+
+    # noinspection PyMethodMayBeStatic
+    async def _handle_new_message(self, message: Message):
+        print(f"{message.peer_id=}, {message.text=}")
 
     async def run(self):
         print("Starting!")
@@ -121,8 +130,8 @@ class Bot:
                 print(f"Long sleep until {future} (now is {now})")
             await asyncio.sleep((future - now).total_seconds())
 
-    async def _send_timetables(self, timetables: Iterable[Timetable]):
-        for timetable in timetables:
+    async def _send_timetables(self, timetables: Sequence[Timetable]):
+        for timetable_number, timetable in enumerate(timetables, start=1):
             post_title, file_extension = (
                 os.path.splitext(timetable.attachment.name)
             )
@@ -145,7 +154,7 @@ class Bot:
                     api=self._vk_group_client.api
                 ).upload(cropped_timetable_image_buffer)
             )
-            await self._vk_group_client.api.wall.post(
+            post = await self._vk_group_client.api.wall.post(
                 owner_id=self._vk_group_id,
                 from_group=True,
                 message=post_title + (
@@ -154,8 +163,41 @@ class Bot:
                 ),
                 attachments=[vk_attachment_string]
             )
+            # noinspection PyTypeChecker
+            messages: List[MessagesSendUserIdsResponseItem] = (
+                await self._vk_group_client.api.messages.send(
+                    attachment=f"wall{self._vk_group_id}_{post.post_id}",
+                    random_id=random.randint(-1_000_000, 1_000_000),
+                    peer_ids=self._config.broadcast_peer_ids
+                )
+            )
+            if len(timetables) == timetable_number:
+                chats = await (
+                    self._vk_group_client.api
+                    .messages.get_conversations_by_id(
+                        peer_ids=self._config.broadcast_peer_ids
+                    )
+                )
+                allowed_peers = set()
+                for chat in chats.items:
+                    if (
+                        chat.chat_settings.pinned_message is None
+                        or (
+                            chat.chat_settings.pinned_message.from_id
+                            == self._vk_group_id
+                        )
+                    ):
+                        allowed_peers.add(chat.peer)
+                for message in messages:
+                    if message.peer_id in allowed_peers:
+                        await self._vk_group_client.api.messages.pin(
+                            peer_id=message.peer_id,
+                            conversation_message_id=(
+                                message.conversation_message_id
+                            )
+                        )
 
-    async def _download_new_timetables(self) -> Iterable[Timetable]:
+    async def _download_new_timetables(self) -> Sequence[Timetable]:
         """
         Get all the timetables. If some of them are not in self._timetable_days,
         it means that they are new and they should be added to the result. After

@@ -26,8 +26,7 @@ async def main():
         netschoolapi_client=netschoolapi_client,
         timetable_days_cacher=TimetableDaysCacher.from_file(
             "data/timetable_days.txt"
-        ),
-        do_logging=config.do_logging
+        )
     )
     await bot.run()
 
