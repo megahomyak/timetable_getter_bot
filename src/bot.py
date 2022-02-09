@@ -204,7 +204,7 @@ class Bot:
                             == self._vk_group_id
                         )
                     ):
-                        allowed_peers.add(chat.peer)
+                        allowed_peers.add(chat.peer.id)
                 for message in messages:
                     if message.peer_id in allowed_peers:
                         await self._vk_group_client.api.messages.pin(
