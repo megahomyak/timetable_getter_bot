@@ -42,7 +42,7 @@ class Bot:
             do_logging: bool):
         self._vk_group_client = vk_group_client
         self._vk_group_id = vk_group_id
-        self._vk_group_client = vk_user_client
+        self._vk_user_client = vk_user_client
         self._config = config
         self._netschoolapi_client = netschoolapi_client
         self._timetable_days_cacher = timetable_days_cacher
@@ -168,10 +168,10 @@ class Bot:
             ).save(cropped_timetable_image_buffer, format=image_format)
             vk_attachment_string: str = (
                 await vkbottle.PhotoWallUploader(
-                    api=self._vk_group_client.api
+                    api=self._vk_user_client.api
                 ).upload(cropped_timetable_image_buffer)
             )
-            post = await self._vk_group_client.api.wall.post(
+            post = await self._vk_user_client.api.wall.post(
                 owner_id=self._vk_group_id,
                 from_group=True,
                 message=post_title + (
@@ -188,7 +188,7 @@ class Bot:
                     peer_ids=self._config.broadcast_peer_ids
                 )
             )
-            if len(timetables) == timetable_number:
+            if timetable_number == 1:
                 chats = await (
                     self._vk_group_client.api
                     .messages.get_conversations_by_id(
