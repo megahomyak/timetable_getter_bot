@@ -24,6 +24,7 @@ TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
     r"расписание для 5-11 классов на (?P<month_day_number>\d+)",
     flags=re.IGNORECASE
 )
+HTML_TAGS_REGEX = re.compile(r"</?\w+>")
 
 
 @dataclass
@@ -236,7 +237,9 @@ class Bot:
                         new_timetable_days.add(timetable_day)
                         if timetable_day not in old_timetable_days:
                             timetables.append(Timetable(
-                                announcement_text=announcement.content,
+                                announcement_text=HTML_TAGS_REGEX.sub(
+                                    "", announcement.content
+                                ),
                                 attachment=attachment
                             ))
             self._timetable_days_cacher.set_days(new_timetable_days)
