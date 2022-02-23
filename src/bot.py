@@ -18,13 +18,20 @@ from src import image_cropper
 from src import time_related_things
 from src.config import Config
 from src.looped_two_ways_iterator import LoopedTwoWaysIterator
-from src.timetable_days_cacher import AbstractTimetableDaysCacher
+from src.timetable_days_cacher import AbstractTimetableDaysCacher, DaysType
 
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
     r"расписание для 5-11 классов на (?P<month_day_number>\d+)",
     flags=re.IGNORECASE
 )
 HTML_TAGS_REGEX = re.compile(r"</?\w+>")
+
+# TODO:
+# check for a new timetable EVERY MINUTE until `maximum_timetable_sending_hour`,
+# and if some of the timetables was updated, send it with the "[ИЗМЕНЕНИЕ]\n\n"
+# sign before it.
+# (Now it is implemented that way: if new timetables were found, bot goes
+# to a long sleep (this is not a separate abstraction, see line 153))
 
 
 @dataclass
@@ -225,7 +232,7 @@ class Bot:
         async with self._timetable_downloading_and_days_caching_lock:
             timetables = []
             old_timetable_days = self._timetable_days_cacher.get_days()
-            new_timetable_days = set()
+            new_timetable_days: DaysType = {}
             for announcement in await self._netschoolapi_client.announcements():
                 for attachment in announcement.attachments:
                     match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.match(
@@ -234,8 +241,13 @@ class Bot:
                     if match:
                         # We got a timetable!
                         timetable_day = int(match.group("month_day_number"))
-                        new_timetable_days.add(timetable_day)
-                        if timetable_day not in old_timetable_days:
+                        new_timetable_days[timetable_day] = (
+                            announcement.post_date
+                        )
+                        if (
+                            old_timetable_days.get(timetable_day)
+                            != announcement.post_date
+                        ):
                             timetables.append(Timetable(
                                 announcement_text=HTML_TAGS_REGEX.sub(
                                     "", announcement.content
