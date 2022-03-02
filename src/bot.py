@@ -32,12 +32,14 @@ HTML_TAGS_REGEX = re.compile(r"</?\w+>")
 # sign before it.
 # (Now it is implemented that way: if new timetables were found, bot goes
 # to a long sleep (this is not a separate abstraction, see line 153))
+# Reopen a session for every request
 
 
 @dataclass
 class Timetable:
     announcement_text: str
     attachment: netschoolapi.schemas.Attachment
+    is_updated: bool
 
 
 class Bot:
@@ -95,30 +97,30 @@ class Bot:
                 # Sleep until the next timetable day if it is late.
                 # Sleep until the next timetable day if timetables were fetched.
                 # Sleep for timetable checking delay otherwise.
-                try:
-                    if self._do_logging:
-                        print(
-                            f"Timetables before receiving new timetables: "
-                            f"{self._timetable_days_cacher.get_days()}"
-                        )
-                    timetables = await self._download_new_timetables()
-                except httpx.HTTPError:
-                    pass
-                else:
-                    if self._do_logging:
-                        print(
-                            f"Timetables after receiving new timetables: "
-                            f"{self._timetable_days_cacher.get_days()}"
-                        )
-                    if timetables:
-                        await self._send_timetables(timetables)
-                        now = time_related_things.now()
+                async with self._netschoolapi_client:
+                    try:
                         if self._do_logging:
-                            print(f"Sent timetables: {timetables} at {now}")
-                        break
+                            print(
+                                f"Timetables before receiving new timetables: "
+                                f"{self._timetable_days_cacher.get_days()}"
+                            )
+                        timetables = await self._download_new_timetables()
+                    except httpx.HTTPError:
+                        pass
                     else:
                         if self._do_logging:
-                            print("=> no new timetables found")
+                            print(
+                                f"Timetables after receiving new timetables: "
+                                f"{self._timetable_days_cacher.get_days()}"
+                            )
+                        if timetables:
+                            await self._send_timetables(timetables)
+                            if self._do_logging:
+                                now = time_related_things.now()
+                                print(f"Sent timetables: {timetables} at {now}")
+                        else:
+                            if self._do_logging:
+                                print("=> no new timetables found")
                 now = time_related_things.now()
                 if now.hour >= self._config.maximum_timetable_sending_hour:
                     break
@@ -179,13 +181,17 @@ class Bot:
                     api=self._vk_user_client.api
                 ).upload(cropped_timetable_image_buffer)
             )
+            message = post_title
+            if timetable.announcement_text:
+                message += (
+                    f"\n\nТекст объявления: {timetable.announcement_text}"
+                )
+            if timetable.is_updated:
+                message = "[ОБНОВЛЕНО]\n\n" + message
             post = await self._vk_user_client.api.wall.post(
                 owner_id=self._vk_group_id,
                 from_group=True,
-                message=post_title + (
-                    f"\n\nТекст объявления: {timetable.announcement_text}"
-                    if timetable.announcement_text else ""
-                ),
+                message=message,
                 attachments=[vk_attachment_string]
             )
             # noinspection PyTypeChecker
@@ -244,15 +250,19 @@ class Bot:
                         new_timetable_days[timetable_day] = (
                             announcement.post_date
                         )
-                        if (
+                        known_announcement_post_date = (
                             old_timetable_days.get(timetable_day)
+                        )
+                        if (
+                            known_announcement_post_date
                             != announcement.post_date
                         ):
                             timetables.append(Timetable(
                                 announcement_text=HTML_TAGS_REGEX.sub(
                                     "", announcement.content
                                 ),
-                                attachment=attachment
+                                attachment=attachment,
+                                is_updated=bool(known_announcement_post_date)
                             ))
             self._timetable_days_cacher.set_days(new_timetable_days)
             return timetables

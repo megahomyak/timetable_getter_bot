@@ -12,11 +12,11 @@ DaysType = Dict[DayNumber, LastChangeDatetime]
 class AbstractTimetableDaysCacher(ABC):
 
     @abstractmethod
-    def set_days(self, days: DaysType[int]):
+    def set_days(self, days: DaysType):
         pass
 
     @abstractmethod
-    def get_days(self) -> DaysType[int]:
+    def get_days(self) -> DaysType:
         pass
 
 
