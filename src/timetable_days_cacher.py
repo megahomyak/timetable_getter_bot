@@ -2,7 +2,6 @@ import datetime
 from abc import ABC, abstractmethod
 from typing import Dict
 
-
 DayNumber = int
 LastChangeDatetime = datetime.datetime
 
@@ -33,9 +32,11 @@ class TimetableDaysCacher(AbstractTimetableDaysCacher):
             days = {}
             with open(save_file_path) as f:
                 for day_number, last_change_timestamp in (
-                    day.split() for day in f.read().split()
+                    day.split("|") for day in f.read().split()
                 ):
-                    days[int(day_number)] = last_change_timestamp
+                    days[int(day_number)] = datetime.datetime.fromtimestamp(
+                        float(last_change_timestamp)
+                    )
         except FileNotFoundError:
             days = set()
         return cls(initial_timetable_days=days, save_file_path=save_file_path)
@@ -43,7 +44,10 @@ class TimetableDaysCacher(AbstractTimetableDaysCacher):
     def set_days(self, days: DaysType):
         if self._timetable_days != days:
             with open(self._save_file_path, "w") as f:
-                f.write(" ".join(str(day) for day in days))
+                f.write(" ".join(
+                    f"{day}|{timestamp.timestamp()}"
+                    for day, timestamp in days.items()
+                ))
         self._timetable_days = days
 
     def get_days(self) -> DaysType:
