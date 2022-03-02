@@ -97,30 +97,30 @@ class Bot:
                 # Sleep until the next timetable day if it is late.
                 # Sleep until the next timetable day if timetables were fetched.
                 # Sleep for timetable checking delay otherwise.
-                async with self._netschoolapi_client:
-                    try:
+                try:
+                    if self._do_logging:
+                        print(
+                            f"Timetables before receiving new timetables: "
+                            f"{self._timetable_days_cacher.get_days()}"
+                        )
+                    timetables = await self._download_new_timetables()
+                except httpx.HTTPError:
+                    pass
+                else:
+                    if self._do_logging:
+                        print(
+                            f"Timetables after receiving new timetables: "
+                            f"{self._timetable_days_cacher.get_days()}"
+                        )
+                    if timetables:
+                        await self._send_timetables(timetables)
                         if self._do_logging:
-                            print(
-                                f"Timetables before receiving new timetables: "
-                                f"{self._timetable_days_cacher.get_days()}"
-                            )
-                        timetables = await self._download_new_timetables()
-                    except httpx.HTTPError:
-                        pass
+                            now = time_related_things.now()
+                            print(f"Sent timetables: {timetables} at {now}")
                     else:
                         if self._do_logging:
-                            print(
-                                f"Timetables after receiving new timetables: "
-                                f"{self._timetable_days_cacher.get_days()}"
-                            )
-                        if timetables:
-                            await self._send_timetables(timetables)
-                            if self._do_logging:
-                                now = time_related_things.now()
-                                print(f"Sent timetables: {timetables} at {now}")
-                        else:
-                            if self._do_logging:
-                                print("=> no new timetables found")
+                            print("=> no new timetables found")
+                await self._netschoolapi_client.logout()
                 now = time_related_things.now()
                 if now.hour >= self._config.maximum_timetable_sending_hour:
                     break
