@@ -14,7 +14,10 @@ async def main():
     config = Config.make_from_file("data/config.json")
     loguru.logger.remove()
     loguru.logger.add(sys.stdout, level="WARNING")
-    netschoolapi_client = NetSchoolAPI(url="https://sgo.edu-74.ru/")
+    netschoolapi_client = NetSchoolAPI(
+        url="https://sgo.edu-74.ru/",
+        default_requests_timeout=0,  # Infinite re-requests
+    )
     await netschoolapi_client.login(
         user_name=config.sgo_username, password=config.sgo_password,
         school=config.school_name
