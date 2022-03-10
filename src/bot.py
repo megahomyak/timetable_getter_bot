@@ -120,13 +120,7 @@ class Bot:
                     else:
                         if self._do_logging:
                             print("=> no new timetables found")
-                try:
-                    await self._netschoolapi_client.logout()
-                except httpx.HTTPStatusError:
-                    # Sometimes it says that I am "401 Unauthorized", like wtf
-                    # bitch I made a request just seconds ago, lifetime of my
-                    # session should be updated
-                    pass
+                await self._netschoolapi_client.logout()
                 now = time_related_things.now()
                 if now.hour >= self._config.maximum_timetable_sending_hour:
                     break
