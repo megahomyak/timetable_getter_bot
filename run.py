@@ -16,7 +16,7 @@ async def main():
     loguru.logger.remove()
     loguru.logger.add(sys.stdout, level="WARNING")
     netschoolapi_client = NetSchoolAPI(
-        url="https://sgo.edu-74.ru/",
+        url=config.site_url,
         default_requests_timeout=0,  # Infinite re-requests
     )
     await netschoolapi_client.login(

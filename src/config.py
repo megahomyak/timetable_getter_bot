@@ -5,6 +5,7 @@ from typing import List
 
 @dataclass
 class Config:
+    site_url: str
     vk_group_token: str
     vk_user_token: str
     sgo_username: str
