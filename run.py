@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import traceback
 
 import loguru
 import vkbottle
@@ -31,7 +32,16 @@ async def main():
             "data/timetable_days.txt"
         )
     )
-    await bot.run()
+    while True:
+        # noinspection PyBroadException
+        try:
+            await bot.run()
+        except Exception as exception:
+            # "Сетевой город" likes to throw sudden errors at me, and I'm tired
+            # to get rid of them individually, so for now this approach is
+            # acceptable
+            traceback.print_exc()
+            await asyncio.sleep(5)  # Just in case
 
 
 asyncio.get_event_loop().run_until_complete(main())
