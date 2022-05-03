@@ -8,6 +8,7 @@ from typing import Sequence, List
 
 import PIL.Image
 import httpx
+import lxml.html
 import netschoolapi.schemas
 import vkbottle
 from netschoolapi import NetSchoolAPI
@@ -24,15 +25,10 @@ TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
     r"расписание для 5-11 классов на (?P<month_day_number>\d+)",
     flags=re.IGNORECASE
 )
-HTML_TAGS_REGEX = re.compile(r"</?\w+>")
 
-# TODO:
-# check for a new timetable EVERY MINUTE until `maximum_timetable_sending_hour`,
-# and if some of the timetables was updated, send it with the "[ИЗМЕНЕНИЕ]\n\n"
-# sign before it.
-# (Now it is implemented that way: if new timetables were found, bot goes
-# to a long sleep (this is not a separate abstraction, see line 153))
-# Reopen a session for every request
+
+def remove_html_tags(string):
+    return str(lxml.html.fromstring(string).text_content())
 
 
 @dataclass
@@ -258,8 +254,8 @@ class Bot:
                             != announcement.post_date
                         ):
                             timetables.append(Timetable(
-                                announcement_text=HTML_TAGS_REGEX.sub(
-                                    "", announcement.content
+                                announcement_text=remove_html_tags(
+                                    announcement.content
                                 ),
                                 attachment=attachment,
                                 is_updated=bool(known_announcement_post_date)
