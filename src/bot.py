@@ -89,10 +89,6 @@ class Bot:
         )
         for next_timetable_weekday in timetable_weekdays_iterator:
             while True:
-                # SLEEP SCHEDULE:
-                # Sleep until the next timetable day if it is late.
-                # Sleep until the next timetable day if timetables were fetched.
-                # Sleep for timetable checking delay otherwise.
                 try:
                     if self._do_logging:
                         print(
