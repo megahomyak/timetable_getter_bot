@@ -28,7 +28,9 @@ TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
 
 
 def remove_html_tags(string):
-    return str(lxml.html.fromstring(string).text_content())
+    if string:
+        string = str(lxml.html.fromstring(string).text_content())
+    return string
 
 
 @dataclass
