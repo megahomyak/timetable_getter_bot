@@ -22,7 +22,7 @@ from src.looped_two_ways_iterator import LoopedTwoWaysIterator
 from src.timetable_days_cacher import AbstractTimetableDaysCacher, DaysType
 
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
-    r"расписание для 5-11 классов на (?P<month_day_number>\d+)",
+    r"расписание для 5-11 клас?сов на (?P<month_day_number>\d+)",
     flags=re.IGNORECASE
 )
 
