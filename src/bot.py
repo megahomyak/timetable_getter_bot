@@ -114,7 +114,6 @@ class Bot:
                     else:
                         if self._do_logging:
                             print("=> no new timetables found")
-                await self._netschoolapi_client.logout()
                 now = time_related_things.now()
                 if now.hour >= self._config.maximum_timetable_sending_hour:
                     break
