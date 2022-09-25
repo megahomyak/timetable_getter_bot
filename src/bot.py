@@ -190,7 +190,8 @@ class Bot:
             # noinspection PyTypeChecker
             messages: List[MessagesSendUserIdsResponseItem] = (
                 await self._vk_group_client.api.messages.send(
-                    attachment=f"wall{self._vk_group_id}_{post.post_id}",
+                    attachment=vk_attachment_string,
+                    message=message,
                     random_id=random.randint(-1_000_000, 1_000_000),
                     peer_ids=self._config.broadcast_peer_ids
                 )
