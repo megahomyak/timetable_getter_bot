@@ -22,7 +22,7 @@ from src.looped_two_ways_iterator import LoopedTwoWaysIterator
 from src.timetable_days_cacher import AbstractTimetableDaysCacher, DaysType
 
 TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
-    r"расписание для 5-11 клас?сов на (?P<month_day_number>\d+)",
+    r"(?P<month_day_number>\d+)\s*(января|февраль|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)",
     flags=re.IGNORECASE
 )
 
@@ -234,29 +234,30 @@ class Bot:
             old_timetable_days = self._timetable_days_cacher.get_days()
             new_timetable_days: DaysType = {}
             for announcement in await self._netschoolapi_client.announcements():
-                for attachment in announcement.attachments:
-                    match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.match(
-                        attachment.name
-                    )
-                    if match:
-                        # We got a timetable!
-                        timetable_day = int(match.group("month_day_number"))
-                        new_timetable_days[timetable_day] = (
-                            announcement.post_date
+                if "расписание" in announcement.name.casefold():
+                    for attachment in announcement.attachments:
+                        match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.search(
+                            attachment.name
                         )
-                        known_announcement_post_date = (
-                            old_timetable_days.get(timetable_day)
-                        )
-                        if (
-                            known_announcement_post_date
-                            != announcement.post_date
-                        ):
-                            timetables.append(Timetable(
-                                announcement_text=remove_html_tags(
-                                    announcement.content
-                                ),
-                                attachment=attachment,
-                                is_updated=bool(known_announcement_post_date)
-                            ))
+                        if match:
+                            # We got a timetable!
+                            timetable_day = int(match.group("month_day_number"))
+                            new_timetable_days[timetable_day] = (
+                                announcement.post_date
+                            )
+                            known_announcement_post_date = (
+                                old_timetable_days.get(timetable_day)
+                            )
+                            if (
+                                known_announcement_post_date
+                                != announcement.post_date
+                            ):
+                                timetables.append(Timetable(
+                                    announcement_text=remove_html_tags(
+                                        announcement.content
+                                    ),
+                                    attachment=attachment,
+                                    is_updated=bool(known_announcement_post_date)
+                                ))
             self._timetable_days_cacher.set_days(new_timetable_days)
             return timetables
