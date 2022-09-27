@@ -165,14 +165,21 @@ class Bot:
                     attachment=timetable.attachment
                 )
             )
-            cropped_timetable_image_buffer = BytesIO()
-            image_cropper.crop_white_margins(
-                PIL.Image.open(timetable_image_as_bytes).convert("RGB")
-            ).save(cropped_timetable_image_buffer, format=image_format)
+            try:
+                cropped_timetable_image_buffer = BytesIO()
+                image_cropper.crop_white_margins(
+                    PIL.Image.open(timetable_image_as_bytes).convert("RGB")
+                ).save(cropped_timetable_image_buffer, format=image_format)
+            except SystemError:
+                # Workaround because of my error in a timetable cropping
+                # algorithm
+                image = timetable_image_as_bytes
+            else:
+                image = cropped_timetable_image_buffer
             vk_attachment_string: str = (
                 await vkbottle.PhotoWallUploader(
                     api=self._vk_user_client.api
-                ).upload(cropped_timetable_image_buffer)
+                ).upload(image)
             )
             message = post_title
             if timetable.announcement_text:
