@@ -222,12 +222,16 @@ class Bot:
                         allowed_peers.add(chat.peer.id)
                 for message in messages:
                     if message.peer_id in allowed_peers:
-                        await self._vk_group_client.api.messages.pin(
-                            peer_id=message.peer_id,
-                            conversation_message_id=(
-                                message.conversation_message_id
+                        try:
+                            await self._vk_group_client.api.messages.pin(
+                                peer_id=message.peer_id,
+                                conversation_message_id=(
+                                    message.conversation_message_id
+                                )
                             )
-                        )
+                        except Exception:
+                            # I don't quite care what gets raised here
+                            pass
 
     async def _download_new_timetables(self) -> Sequence[Timetable]:
         """
