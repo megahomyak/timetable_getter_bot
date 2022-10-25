@@ -260,7 +260,7 @@ class Bot:
                             attachment.name
                         )
                         if match:
-                            # We got a timetable!
+                            # We've got a timetable!
                             timetable_day = int(match.group("month_day_number"))
                             new_timetable_days[timetable_day] = (
                                 announcement.post_date
