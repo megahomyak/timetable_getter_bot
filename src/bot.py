@@ -194,15 +194,19 @@ class Bot:
                 message=message,
                 attachments=[vk_attachment_string]
             )
-            # noinspection PyTypeChecker
-            messages: List[MessagesSendUserIdsResponseItem] = (
-                await self._vk_group_client.api.messages.send(
-                    attachment=vk_attachment_string,
-                    message=message,
-                    random_id=random.randint(-1_000_000, 1_000_000),
-                    peer_ids=self._config.broadcast_peer_ids
+            try:
+                # noinspection PyTypeChecker
+                messages: List[MessagesSendUserIdsResponseItem] = (
+                    await self._vk_group_client.api.messages.send(
+                        attachment=vk_attachment_string,
+                        message=message,
+                        random_id=random.randint(-1_000_000, 1_000_000),
+                        peer_ids=self._config.broadcast_peer_ids
+                    )
                 )
-            )
+            except Exception:
+                # I don't care much about it, I don't want an exception to block the pinning
+                pass
             if timetable_number == 1:
                 chats = await (
                     self._vk_group_client.api
@@ -213,10 +217,12 @@ class Bot:
                 allowed_peers = set()
                 for chat in chats.items:
                     if (
-                        chat.chat_settings.pinned_message is None
-                        or (
-                            chat.chat_settings.pinned_message.from_id
-                            == self._vk_group_id
+                        chat.chat_settings and (
+                            chat.chat_settings.pinned_message is None
+                            or (
+                                chat.chat_settings.pinned_message.from_id
+                                == self._vk_group_id
+                            )
                         )
                     ):
                         allowed_peers.add(chat.peer.id)
