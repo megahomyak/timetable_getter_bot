@@ -14,6 +14,7 @@ import vkbottle
 from netschoolapi import NetSchoolAPI
 from vkbottle.bot import Message
 from vkbottle_types.objects import MessagesSendUserIdsResponseItem
+import html
 
 from src import image_cropper
 from src import time_related_things
@@ -30,6 +31,7 @@ TIMETABLE_ANNOUNCEMENT_TITLE_REGEX = re.compile(
 def remove_html_tags(string):
     if string:
         string = str(lxml.html.fromstring(string).text_content())
+        string = html.unescape(string)
     return string
 
 
