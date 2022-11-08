@@ -38,7 +38,7 @@ class TimetableDaysCacher(AbstractTimetableDaysCacher):
                         float(last_change_timestamp)
                     )
         except FileNotFoundError:
-            days = set()
+            days = {}
         return cls(initial_timetable_days=days, save_file_path=save_file_path)
 
     def set_days(self, days: DaysType):
