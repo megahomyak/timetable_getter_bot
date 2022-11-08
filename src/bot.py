@@ -258,12 +258,12 @@ class Bot:
                         if "звон" in attachment.name:
                             # Not matching the bells timetable (this also exists)
                             continue
-                        match = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.search(
+                        match_ = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.search(
                             attachment.name
                         )
-                        if match:
+                        if match_:
                             # We've got a timetable!
-                            timetable_day = int(match.group("month_day_number"))
+                            timetable_day = int(match_.group("month_day_number"))
                             new_timetable_days[timetable_day] = (
                                 announcement.post_date
                             )
