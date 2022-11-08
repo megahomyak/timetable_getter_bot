@@ -44,4 +44,4 @@ async def main():
             await asyncio.sleep(5)  # Just in case
 
 
-asyncio.get_event_loop().run_until_complete(main())
+asyncio.run(main())
