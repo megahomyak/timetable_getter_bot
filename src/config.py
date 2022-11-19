@@ -17,7 +17,6 @@ class Config:
     timetable_weekdays: List[int]
     do_logging: bool
     print_incoming_messages: int
-    broadcast_peer_ids: List[int]
 
     @classmethod
     def make_from_file(cls, filename: str, encoding="utf-8"):
