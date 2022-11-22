@@ -197,6 +197,8 @@ class Bot:
             )
             peers = await self._vk_group_client.api.messages.get_conversations()
             peer_ids = [peer.conversation.peer.id for peer in peers.items]  # type: ignore
+            if self._config.do_logging:
+                print(f"Peer IDs that were found: {peer_ids}")
             messages: List[MessagesSendUserIdsResponseItem] = (  # type: ignore
                 await self._vk_group_client.api.messages.send(
                     attachment=vk_attachment_string,
