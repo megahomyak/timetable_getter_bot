@@ -17,7 +17,8 @@
            "maximum_timetable_sending_hour": 22,
            "timetable_weekdays": [0, 1, 2, 3, 4, 5],
            "do_logging": set to true if you want to see some of the bot's actions logged to the console (otherwise set to false),
-           "print_incoming_messages": set to true if you want to see peer ids of incoming messages (otherwise set to false)
+           "print_incoming_messages": set to true if you want to see peer ids of incoming messages (otherwise set to false),
+           "broadcast_peer_ids": [list of VK peer ids to send timetables to]
        }
 
    I think, fields without descriptions are self-explanatory.

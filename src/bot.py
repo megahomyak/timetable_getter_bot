@@ -173,11 +173,12 @@ class Bot:
                     PIL.Image.open(timetable_image_as_bytes).convert("RGB")
                 ).save(cropped_timetable_image_buffer, format=image_format)
             except SystemError:
-                # Work around an error in a timetable cropping algorithm
+                # Workaround because of my error in a timetable cropping
+                # algorithm
                 image = timetable_image_as_bytes
             else:
                 image = cropped_timetable_image_buffer
-            vk_attachment_string: str = (  # type: ignore
+            vk_attachment_string: str = (
                 await vkbottle.PhotoWallUploader(
                     api=self._vk_user_client.api
                 ).upload(image)
@@ -189,29 +190,30 @@ class Bot:
                 )
             if timetable.is_updated:
                 message = "[ОБНОВЛЕНО]\n\n" + message
-            await self._vk_user_client.api.wall.post(
+            post = await self._vk_user_client.api.wall.post(
                 owner_id=self._vk_group_id,
                 from_group=True,
                 message=message,
                 attachments=[vk_attachment_string]
             )
-            peers = await self._vk_group_client.api.messages.get_conversations()
-            peer_ids = [peer.conversation.peer.id for peer in peers.items]  # type: ignore
-            if self._config.do_logging:
-                print(f"Peer IDs that were found: {peer_ids}")
-            messages: List[MessagesSendUserIdsResponseItem] = (  # type: ignore
-                await self._vk_group_client.api.messages.send(
-                    attachment=vk_attachment_string,
-                    message=message,
-                    random_id=random.randint(-1_000_000, 1_000_000),
-                    peer_ids=peer_ids,
+            try:
+                # noinspection PyTypeChecker
+                messages: List[MessagesSendUserIdsResponseItem] = (
+                    await self._vk_group_client.api.messages.send(
+                        attachment=vk_attachment_string,
+                        message=message,
+                        random_id=random.randint(-1_000_000, 1_000_000),
+                        peer_ids=self._config.broadcast_peer_ids
+                    )
                 )
-            )
+            except Exception:
+                # I don't care much about it, I don't want an exception to block the pinning
+                pass
             if timetable_number == 1:
                 chats = await (
                     self._vk_group_client.api
                     .messages.get_conversations_by_id(
-                        peer_ids=peer_ids,
+                        peer_ids=self._config.broadcast_peer_ids
                     )
                 )
                 allowed_peers = set()
