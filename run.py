@@ -21,7 +21,7 @@ async def main():
     )
     await netschoolapi_client.login(
         user_name=config.sgo_username, password=config.sgo_password,
-        school=config.school_name
+        school_name_or_id=config.school_name
     )
     bot = await Bot.new(
         config=config,
