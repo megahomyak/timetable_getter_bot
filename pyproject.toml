@@ -11,7 +11,7 @@ packages = [{include = "timetable_getter_bot"}]
 python = "^3.8"
 loguru = "^0.6.0"
 vkbottle = "^4.3.12"
-netschoolapi = "^8.0.0"
+netschoolapi = "^11.0.0"
 pillow = "^9.3.0"
 lxml = "^4.9.1"
 pytz = "^2022.6"
