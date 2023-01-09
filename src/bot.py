@@ -255,7 +255,7 @@ class Bot:
             for announcement in await self._netschoolapi_client.announcements():
                 if "расписание" in announcement.name.casefold():
                     for attachment in announcement.attachments:
-                        if "звон" in attachment.name:
+                        if "звон" in attachment.name.casefold():
                             # Not matching the bells timetable (this also exists)
                             continue
                         match_ = TIMETABLE_ANNOUNCEMENT_TITLE_REGEX.search(
