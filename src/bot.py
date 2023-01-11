@@ -162,11 +162,8 @@ class Bot:
             )
             if image_format == "jpg":
                 image_format = "jpeg"
-            timetable_image_as_bytes = await (
-                self._netschoolapi_client.download_attachment_as_bytes(
-                    attachment=timetable.attachment
-                )
-            )
+            timetable_image_as_bytes = BytesIO()
+            await self._netschoolapi_client.download_attachment(timetable.attachment.id, timetable_image_as_bytes)
             try:
                 cropped_timetable_image_buffer = BytesIO()
                 image_cropper.crop_white_margins(
