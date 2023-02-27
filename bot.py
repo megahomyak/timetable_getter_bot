@@ -14,8 +14,6 @@ import sys
 import re
 import datetime
 import os
-from margincropper import crop_margins, ContentNotFound
-import PIL.Image
 from vkbottle_types.objects import MessagesSendUserIdsResponseItem
 from loguru import logger
 
@@ -133,15 +131,6 @@ async def run():
                 attachment_id=timetable.attachment.id,
                 buffer=image,
             )
-            image.seek(0)
-            try:
-                crop_margins(
-                    PIL.Image.open(image).convert("RGB"),
-                    margin_color=(0, 0, 0),
-                    max_margin_color_difference=20,
-                ).save(image, format=image_format)
-            except ContentNotFound:
-                pass
             image.seek(0)
             vk_attachment_string: str = await vkbottle.PhotoWallUploader(
                 api=vk_user_client.api,
