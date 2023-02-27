@@ -2,22 +2,22 @@ import asyncio
 from dataclasses import dataclass
 from io import BytesIO
 import json
+import logging
 import random
 from typing import Dict, List, Set
 import lxml.html
 import html
 from netschoolapi import netschoolapi
 import vkbottle
-import loguru
 import vkbottle.bot
 import sys
 import re
 import datetime
-from logging import Logger
 import os
 from margincropper import crop_margins, ContentNotFound
 import PIL.Image
 from vkbottle_types.objects import MessagesSendUserIdsResponseItem
+from loguru import logger
 
 @dataclass
 class Config:
@@ -39,9 +39,6 @@ class Timetable:
 
 with open("data/config.json") as f:
     config = Config(**json.load(f))
-
-logger = Logger("TGB")
-logger.setLevel(config.log_level)
 
 def open_or(path, alternative):
     try:
@@ -96,9 +93,9 @@ async def run():
     for line in open_or(TIMETABLE_TIMES_PATH, "").strip().split():
         day, time_ = line.split(":")
         old_timetable_times[int(day)] = float(time_)
-    logger.info("Starting!")
+    print("Starting!")
     while True:
-        logger.debug(f"Timetables times before receiving new timetables (at {datetime.datetime.now()}): {old_timetable_times}")
+        print(f"Timetables times before receiving new timetables (at {datetime.datetime.now()}): {old_timetable_times}")
         new_timetable_times: TimetableTimes = {}
         new_timetables: List[Timetable] = []
         for announcement in await netschoolapi_client.announcements():
@@ -106,9 +103,10 @@ async def run():
                 match_ = TIMETABLE_NAME_REGEX.match(attachment.name)
                 if match_ is not None:
                     day = int(match_.group("day"))
-                    new_timetable_times[day] = announcement.post_date.timestamp()
+                    time = announcement.post_date.timestamp()
+                    new_timetable_times[day] = time
                     old_time = old_timetable_times.get(day)
-                    if old_time != announcement.post_date:
+                    if old_time != time or True:
                         new_timetables.append(Timetable(
                             announcement_text=remove_html_tags(announcement.content),
                             attachment=attachment,
@@ -120,13 +118,14 @@ async def run():
                 ":".join((str(day), str(time)))
                 for day, time in new_timetable_times.items()
             ))
-        logger.debug(f"Timetables times after receiving new timetables (at {datetime.datetime.now()}): {new_timetable_times}")
+        print(f"Timetables times after receiving new timetables (at {datetime.datetime.now()}): {new_timetable_times}")
         if new_timetables:
-            logger.debug(f"Sending the following timetables (at {datetime.datetime.now()}): {new_timetables}")
+            print(f"Sending the following timetables (at {datetime.datetime.now()}): {new_timetables}")
         else:
-            logger.debug(f"No new timetables found (at {datetime.datetime.now()})")
+            print(f"No new timetables found (at {datetime.datetime.now()})")
         for timetable in new_timetables:
             post_title, image_format = os.path.splitext(timetable.attachment.name)
+            image_format = image_format[1:]
             if image_format == "jpg":
                 image_format = "jpeg"
             image = BytesIO()
@@ -134,6 +133,7 @@ async def run():
                 attachment_id=timetable.attachment.id,
                 buffer=image,
             )
+            image.seek(0)
             try:
                 crop_margins(
                     PIL.Image.open(image).convert("RGB"),
@@ -142,6 +142,7 @@ async def run():
                 ).save(image, format=image_format)
             except ContentNotFound:
                 pass
+            image.seek(0)
             vk_attachment_string: str = await vkbottle.PhotoWallUploader(
                 api=vk_user_client.api,
             ).upload(image)
@@ -150,56 +151,63 @@ async def run():
                 message += f"\n\nТекст объявления: {timetable.announcement_text}"
             if timetable.is_updated:
                 message = "[ОБНОВЛЕНО]\n\n" + message
-            post = await vk_user_client.api.wall.post(
+            await vk_user_client.api.wall.post(
                 owned_id=config.vk_group_id,
                 from_group=True,
                 message=message,
                 attachments=[vk_attachment_string],
             )
-            for peer_id in broadcast_peer_ids:
-                messages: List[MessagesSendUserIdsResponseItem] = (
-                    await vk_group_client.api.messages.send(
-                        attachment=vk_attachment_string,
-                        message=message,
-                        random_id=random.randint(-1_000_000, 1_000_000),
-                        peer_ids=list(broadcast_peer_ids),
-                    )
+            if not broadcast_peer_ids:
+                continue
+            messages: List[MessagesSendUserIdsResponseItem] = (
+                await vk_group_client.api.messages.send(
+                    attachment=vk_attachment_string,
+                    message=message,
+                    random_id=random.randint(-1_000_000, 1_000_000),
+                    peer_ids=list(broadcast_peer_ids),
                 )
-                chats = await (
-                    vk_group_client.api.messages.get_conversations_by_id(
-                        peer_ids=list(broadcast_peer_ids)
-                    )
+            )
+            chats = await (
+                vk_group_client.api.messages.get_conversations_by_id(
+                    peer_ids=list(broadcast_peer_ids)
                 )
-                allowed_peers = set()
-                for chat in chats.items:
-                    if (
-                        chat.chat_settings and (
-                            chat.chat_settings.pinned_message is None
-                            or (
-                                chat.chat_settings.pinned_message.from_id
-                                == config.vk_group_id
+            )
+            allowed_peers = set()
+            for chat in chats.items:
+                if (
+                    chat.chat_settings and (
+                        chat.chat_settings.pinned_message is None
+                        or (
+                            chat.chat_settings.pinned_message.from_id
+                            == config.vk_group_id
+                        )
+                    )
+                ):
+                    allowed_peers.add(chat.peer.id)
+            for message in messages:
+                if message.peer_id in allowed_peers:
+                    try:
+                        await vk_group_client.api.messages.pin(
+                            peer_id=message.peer_id,
+                            conversation_message_id=(
+                                message.conversation_message_id
                             )
                         )
-                    ):
-                        allowed_peers.add(chat.peer.id)
-                for message in messages:
-                    if message.peer_id in allowed_peers:
-                        try:
-                            await vk_group_client.api.messages.pin(
-                                peer_id=message.peer_id,
-                                conversation_message_id=(
-                                    message.conversation_message_id
-                                )
-                            )
-                        except Exception:  # I do not bother about this either
-                            pass
+                    except Exception:  # I do not bother about this either
+                        pass
+        await asyncio.sleep(config.timetable_checking_delay_in_seconds)
 
 
 async def main():
-    asyncio.create_task(run())
     vk_group_client.on.message()(handle_new_message)
-    await vk_group_client.run_polling()
+    await asyncio.gather(
+        run(),
+        vk_group_client.run_polling(),
+    )
 
 
-loguru.logger.remove()
-loguru.logger.add(sys.stdout, level="WARNING")
+logger.remove()
+logger.add(sys.stdout, level="WARNING")
+
+
+asyncio.run(main())
