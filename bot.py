@@ -59,7 +59,7 @@ TIMETABLE_TIMES_PATH = "data/timetable_days.txt"
 
 broadcast_peer_ids: Set[int] = set(
     int(i) for i in
-    open_or(BROADCAST_PEER_IDS_PATH, "").strip().split("\n")
+    open_or(BROADCAST_PEER_IDS_PATH, "").strip().split()
 )
 
 TIMETABLE_NAME_REGEX = re.compile(r"Распис\w+ (?!звон).*кла\D*(?P<day>\d+)", re.IGNORECASE)
@@ -93,7 +93,7 @@ async def run():
         config.sgo_username, config.sgo_password, config.sgo_school_name
     )
     old_timetable_times: TimetableTimes = {}
-    for line in open_or(TIMETABLE_TIMES_PATH, "").strip().split("\n"):
+    for line in open_or(TIMETABLE_TIMES_PATH, "").strip().split():
         day, time_ = line.split(":")
         old_timetable_times[int(day)] = float(time_)
     logger.info("Starting!")
