@@ -104,7 +104,7 @@ async def run():
                     time = announcement.post_date.timestamp()
                     new_timetable_times[day] = time
                     old_time = old_timetable_times.get(day)
-                    if old_time != time or True:
+                    if old_time != time:
                         new_timetables.append(Timetable(
                             announcement_text=remove_html_tags(announcement.content),
                             attachment=attachment,
@@ -117,11 +117,12 @@ async def run():
                 for day, time in new_timetable_times.items()
             ))
         print(f"Timetables times after receiving new timetables (at {datetime.datetime.now()}): {new_timetable_times}")
+        new_timetables.reverse()
         if new_timetables:
             print(f"Sending the following timetables (at {datetime.datetime.now()}): {new_timetables}")
         else:
             print(f"No new timetables found (at {datetime.datetime.now()})")
-        for timetable in new_timetables:
+        for timetable_number, timetable in enumerate(new_timetables, start=1):
             post_title, image_format = os.path.splitext(timetable.attachment.name)
             image_format = image_format[1:]
             if image_format == "jpg":
@@ -141,7 +142,7 @@ async def run():
             if timetable.is_updated:
                 message = "[ОБНОВЛЕНО]\n\n" + message
             await vk_user_client.api.wall.post(
-                owned_id=config.vk_group_id,
+                owner_id=config.vk_group_id,
                 from_group=True,
                 message=message,
                 attachments=[vk_attachment_string],
@@ -156,6 +157,8 @@ async def run():
                     peer_ids=list(broadcast_peer_ids),
                 )
             )
+            if timetable_number != len(new_timetables):
+                continue
             chats = await (
                 vk_group_client.api.messages.get_conversations_by_id(
                     peer_ids=list(broadcast_peer_ids)

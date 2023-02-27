@@ -1,6 +1,2 @@
-.idea
-timetable_getter_bot.iml
-data/config.json
-.pytest_cache
-data/timetable_days.txt
+data/*
 **/__pycache__
