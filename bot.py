@@ -2,7 +2,6 @@ import asyncio
 from dataclasses import dataclass
 from io import BytesIO
 import json
-import logging
 import random
 from typing import Dict, List, Set
 import lxml.html
@@ -16,6 +15,8 @@ import datetime
 import os
 from vkbottle_types.objects import MessagesSendUserIdsResponseItem
 from loguru import logger
+from margincropper import crop_margins, ContentNotFound
+import PIL.Image
 
 @dataclass
 class Config:
@@ -132,6 +133,18 @@ async def run():
                 attachment_id=timetable.attachment.id,
                 buffer=image,
             )
+            image.seek(0)
+            try:
+                cropped_image = BytesIO()
+                crop_margins(
+                    PIL.Image.open(image).convert("RGB"),
+                    margin_color=(255, 255, 255),
+                    max_margin_color_difference=128,
+                ).save(cropped_image, format=image_format)
+            except ContentNotFound:
+                pass
+            else:
+                image = cropped_image
             image.seek(0)
             vk_attachment_string: str = await vkbottle.PhotoWallUploader(
                 api=vk_user_client.api,
