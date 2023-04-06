@@ -112,11 +112,6 @@ async def run():
                             is_updated=bool(old_time)
                         ))
         old_timetable_times = new_timetable_times
-        with open(TIMETABLE_TIMES_PATH, "w") as f:
-            f.write("\n".join(
-                ":".join((str(day), str(time)))
-                for day, time in new_timetable_times.items()
-            ))
         print(f"Timetables times after receiving new timetables (at {datetime.datetime.now()}): {new_timetable_times}")
         new_timetables.reverse()
         if new_timetables:
@@ -201,6 +196,11 @@ async def run():
                     except Exception:  # I do not bother about this either
                         pass
         await asyncio.sleep(config.timetable_checking_delay_in_seconds)
+        with open(TIMETABLE_TIMES_PATH, "w") as f:
+            f.write("\n".join(
+                ":".join((str(day), str(time)))
+                for day, time in new_timetable_times.items()
+            ))
 
 
 async def main():
