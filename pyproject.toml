@@ -5,12 +5,11 @@ description = "A bot to listen for new timetables posted by my school's administ
 authors = ["megahomyak <g.megahomyak@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "timetable_getter_bot"}]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 loguru = "^0.6.0"
-vkbottle = "^4.0.0"
+vkbottle = "4.6.1"
 netschoolapi = "^11.0.0"
 pillow = "^9.3.0"
 lxml = "^4.9.1"
