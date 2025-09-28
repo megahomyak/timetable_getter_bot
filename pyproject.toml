@@ -7,13 +7,13 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
-loguru = "^0.6.0"
+python = "3.9"
+loguru = "0.6.0"
 vkbottle = "4.6.1"
-netschoolapi = "^11.0.0"
-pillow = "^9.3.0"
-lxml = "^4.9.1"
-margincropper = "^1.0.1"
+netschoolapi = "11.0.2"
+pillow = "9.4.0"
+lxml = "4.9.1"
+margincropper = "1.0.1"
 
 [build-system]
 requires = ["poetry-core"]
